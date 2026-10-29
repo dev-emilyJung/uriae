@@ -167,3 +167,4 @@ summary { color: var(--soft); font-size: 13px; cursor: pointer; width: fit-conte
   .period .refs { grid-column: 1 / -1; grid-row: 3; margin-top: 6px; }
   .period .btn { grid-column: 2; }
 }
+.diag { font-size: 12px; color: var(--faint); margin-top: 2px; }

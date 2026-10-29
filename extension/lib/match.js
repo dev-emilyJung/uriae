@@ -28,12 +28,11 @@ export function refsFor(dateYMD, refs, windowDays = 270) {
   return [...dated].sort((a, b) => dist(a) - dist(b)).slice(0, 4);
 }
 
-/** 얼굴 하나의 점수 = 가장 비슷한 기준 2개의 평균 (기준 하나가 우연히 닮은 경우를 줄임) */
+/** 얼굴 하나의 점수 = 가장 닮은 기준 얼굴과의 유사도 */
 export function faceScore(emb, refs) {
-  const sims = refs.map((r) => cosine(emb, r.emb)).sort((a, b) => b - a);
-  if (!sims.length) return 0;
-  if (sims.length === 1) return sims[0];
-  return (sims[0] + sims[1]) / 2;
+  let best = 0;
+  for (const r of refs) best = Math.max(best, cosine(emb, r.emb));
+  return best;
 }
 
 function quantile(sorted, p) {
@@ -44,20 +43,70 @@ function quantile(sorted, p) {
 }
 
 /**
- * 점수 분포로 기준선 정하기.
- * allFaceScores: 이번에 확인한 모든 얼굴의 점수 (대부분 다른 아이들)
- * strictness: 0(많이 찾기) ~ 1(정확하게)
+ * 기준선 정하기.
+ * 아이 얼굴은 모델이 서로 비슷하게 보는 편이라 "점수가 튀는 정도"가 잘 안 나온다.
+ * 대신 반 아이가 보통 15~20명이므로 한 아이는 전체 얼굴의 약 5%라는 점을 이용해
+ * 점수 상위 일부만 "우리 아이", 그다음 구간을 "확인 필요"로 둔다.
+ * strictness: 0(많이 찾기, 상위 6%) ~ 1(정확하게, 상위 1.5%)
  */
 export function thresholds(allFaceScores, strictness = 0.5) {
   const s = [...allFaceScores].sort((a, b) => a - b);
   const median = quantile(s, 0.5);
   const mad = quantile([...s.map((x) => Math.abs(x - median))].sort((a, b) => a - b), 0.5) * 1.4826 || 0.05;
-  // 공개 얼굴 데이터 기준: 다른 사람 점수의 중앙값 + 3σ 위면 오인율 약 0.1%, 같은 사람의 약 75%를 잡음
-  const k = 2.5 + strictness * 1.5; // 2.5 ~ 4
-  // 절대 하한: 다른 사람끼리도 이 정도는 나올 수 있는 값 아래로는 내려가지 않음
-  const sure = Math.max(median + k * mad, 0.5);
-  const maybe = Math.max(median + (k - 1) * mad, 0.42);
-  return { median, mad, sure, maybe, n: s.length };
+  const top = 0.06 - strictness * 0.045;
+  const sure = Math.max(quantile(s, 1 - top), median + 1.5 * mad, 0.5);
+  const maybe = Math.max(quantile(s, 1 - top * 2.5), median + 0.8 * mad, 0.45);
+  return { median, mad, sure, maybe: Math.min(maybe, sure), top, n: s.length };
+}
+
+/** 기준 얼굴끼리의 유사도 (자기 자신 제외 최댓값). 같은 아이 얼굴이 보통 몇 점인지 보는 진단용 */
+export function refAgreement(refs) {
+  if (refs.length < 2) return null;
+  const v = refs.map((r, i) => Math.max(...refs.filter((_, j) => j !== i).map((o) => cosine(r.emb, o.emb)))).sort((a, b) => a - b);
+  return { min: v[0], median: quantile(v, 0.5) };
+}
+
+/**
+ * 같은 날 사진끼리 연결: 확실한 우리 아이 얼굴과 같은 날(±2일) 찍힌 얼굴 중
+ * 아주 닮은 얼굴(link 이상)을 우리 아이로 추가한다. 늘어난 얼굴로 한 번 더 반복.
+ * faces: [{key, date, emb, score}]  sureKeys: Set  → 추가된 key Set
+ */
+export function propagate(faces, sureKeys, { link, floor, days = 2, rounds = 2 }) {
+  const DAYMS = 86400000;
+  const added = new Set();
+  let frontier = faces.filter((f) => sureKeys.has(f.key));
+  for (let r = 0; r < rounds && frontier.length; r++) {
+    const next = [];
+    for (const f of faces) {
+      if (sureKeys.has(f.key) || added.has(f.key) || f.score < floor) continue;
+      const t = Date.parse(f.date);
+      for (const g of frontier) {
+        if (Math.abs(Date.parse(g.date) - t) > days * DAYMS) continue;
+        if (cosine(f.emb, g.emb) >= link) {
+          added.add(f.key);
+          next.push(f);
+          break;
+        }
+      }
+    }
+    frontier = next;
+  }
+  return added;
+}
+
+/** 서로 다른 얼굴 쌍의 유사도 분포에서 "아주 닮음" 기준 (무작위 쌍 대부분은 다른 아이) */
+export function linkThreshold(faces, samples = 4000) {
+  if (faces.length < 20) return 0.95;
+  const sims = [];
+  let seed = 12345;
+  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  for (let i = 0; i < samples; i++) {
+    const a = faces[Math.floor(rnd() * faces.length)], b = faces[Math.floor(rnd() * faces.length)];
+    if (a === b) continue;
+    sims.push(cosine(a.emb, b.emb));
+  }
+  sims.sort((x, y) => x - y);
+  return Math.max(quantile(sims, 0.995), 0.6);
 }
 
 /** 생년월일 기준 6개월 단위 기간 목록 (최근 maxYears 년) */

@@ -41,3 +41,15 @@ test('생년월일 기준 6개월 기간', () => {
   assert.equal(p[0].end, '2026-10-29');
   assert.equal(p[1].label, '만 5세 전반');
 });
+
+test('같은 날 사진 연결: 확실한 얼굴과 아주 닮은 같은 날 얼굴을 추가', async () => {
+  const { propagate } = await import('../extension/lib/match.js');
+  const faces = [
+    { key: 'a', date: '2026-10-20', emb: [1, 0, 0], score: 0.9 },
+    { key: 'b', date: '2026-10-20', emb: [0.98, 0.05, 0], score: 0.7 }, // 같은 날, 아주 닮음 → 추가
+    { key: 'c', date: '2026-10-10', emb: [0.98, 0.05, 0], score: 0.7 }, // 날짜가 멀어 제외
+    { key: 'd', date: '2026-10-20', emb: [0, 1, 0], score: 0.7 }, // 안 닮음 → 제외
+  ];
+  const added = propagate(faces, new Set(['a']), { link: 0.95, floor: 0.5 });
+  assert.deepEqual([...added], ['b']);
+});

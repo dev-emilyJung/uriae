@@ -254,6 +254,7 @@ async function showPrep() {
 //       이번에 확인한 모든 얼굴의 점수 분포에서 "튀게 높은" 것만 우리 아이로 본다.
 // 저장: 사진별 얼굴 점수(숫자)만 저장. 다른 아이들의 얼굴 특징값은 저장하지 않는다.
 let photoState = null;
+const faceMem = new Map(); // 사진 id → 얼굴 특징값 (이 탭이 열려 있는 동안만, 저장 안 함)
 const selSig = () => [...selected].sort().join(',');
 const refsSig = (refs) => refs.map((r) => r.id).sort().join(',');
 
@@ -291,7 +292,7 @@ async function showPhotos() {
 
 async function runSearch(days, kids, ui) {
   const { initFace, detectFaces } = await import('./lib/face.js');
-  const { refsFor, faceScore, thresholds } = await import('./lib/match.js');
+  const { refsFor, faceScore, thresholds, refAgreement, propagate, linkThreshold } = await import('./lib/match.js');
   ui.runBtn.disabled = true;
   ui.bar.hidden = false;
   ui.results.replaceChildren();
@@ -328,50 +329,56 @@ async function runSearch(days, kids, ui) {
       }
     }
 
-    // 2) 앨범 사진의 얼굴 점수 (기준 얼굴이 같으면 저장된 점수 재사용)
-    const caches = new Map();
-    for (const kid of kids) {
-      const c = await store.get(K.scores(kid.child), null);
-      const sig = refsSig(kid.refs);
-      caches.set(kid.child, c && c.sig === sig ? c : { sig, map: {} });
-    }
-    const flush = () => Promise.all(kids.map((k) => store.set(K.scores(k.child), caches.get(k.child))));
-    let done = 0, dirty = 0, faces = 0;
+    // 2) 앨범 사진 속 얼굴 찾기. 얼굴 특징값은 이 탭이 열려 있는 동안 메모리에만 두고 저장하지 않는다.
+    let done = 0, nfaces = 0;
     const queue = albumJobs.slice();
     const worker = async () => {
       while (queue.length) {
         const it = queue.shift();
-        const map = caches.get(it.kid.child).map;
-        if (!map[it.img.id]) {
+        if (!faceMem.has(it.img.id)) {
           try {
-            const fs = await detectFaces(it.img.large || it.img.original);
-            const refs = refsFor(it.date, it.kid.refs);
-            map[it.img.id] = fs.map((f) => Math.round(faceScore(f.emb, refs) * 1000) / 1000);
+            faceMem.set(it.img.id, (await detectFaces(it.img.large || it.img.original)).map((f) => ({ emb: f.emb, size: f.size })));
           } catch {
-            map[it.img.id] = [];
+            faceMem.set(it.img.id, []);
           }
-          if (++dirty >= 25) { dirty = 0; flush(); }
         }
-        it.faceScores = map[it.img.id];
-        it.score = it.faceScores.length ? Math.max(...it.faceScores) : 0;
-        faces += it.faceScores.length;
+        nfaces += faceMem.get(it.img.id).length;
         done++;
         fill.style.width = `${(done / albumJobs.length) * 100}%`;
-        ui.status.textContent = `앨범 사진 ${albumJobs.length}장 중 ${done}장 확인 · 얼굴 ${faces}개`;
+        ui.status.textContent = `앨범 사진 ${albumJobs.length}장 중 ${done}장 확인 · 얼굴 ${nfaces}개`;
       }
     };
     await Promise.all([worker(), worker()]);
-    await flush();
 
-    // 3) 아이별로 점수 분포를 보고 판정
+    // 3) 아이별 판정: 상위 점수 + 같은 날 사진 연결
     const strictness = await store.get(K.strictness, 0.5);
     const groups = kids.map((kid) => {
       const mine = albumJobs.filter((j) => j.kid === kid);
-      const th = thresholds(mine.flatMap((j) => j.faceScores), strictness);
-      const sure = mine.filter((j) => j.score >= th.sure).sort((a, b) => b.date.localeCompare(a.date));
-      const maybe = mine.filter((j) => j.score >= th.maybe && j.score < th.sure).sort((a, b) => b.score - a.score).slice(0, 300);
+      const faces = [];
+      for (const j of mine) {
+        const refs = refsFor(j.date, kid.refs);
+        faceMem.get(j.img.id).forEach((f, i) => faces.push({ key: `${j.img.id}:${i}`, job: j, date: j.date, emb: f.emb, score: faceScore(f.emb, refs) }));
+      }
+      const th = thresholds(faces.map((f) => f.score), strictness);
+      const sureKeys = new Set(faces.filter((f) => f.score >= th.sure).map((f) => f.key));
+      const link = linkThreshold(faces);
+      const linked = propagate(faces, sureKeys, { link, floor: th.median });
+      const best = new Map(); // 사진별 가장 우리 아이다운 얼굴
+      for (const f of faces) {
+        const level = sureKeys.has(f.key) ? 3 : linked.has(f.key) ? 2 : f.score >= th.maybe ? 1 : 0;
+        const prev = best.get(f.job.img.id);
+        if (!prev || level > prev.level || (level === prev.level && f.score > prev.score)) best.set(f.job.img.id, { level, score: f.score });
+      }
+      for (const j of mine) {
+        const b = best.get(j.img.id) || { level: 0, score: 0 };
+        j.level = b.level;
+        j.score = b.score;
+      }
+      const sure = mine.filter((j) => j.level >= 2).sort((a, b) => b.date.localeCompare(a.date));
+      const maybe = mine.filter((j) => j.level === 1).sort((a, b) => b.score - a.score).slice(0, 300);
       const reports = reportJobs.filter((j) => j.kid === kid).sort((a, b) => b.date.localeCompare(a.date));
-      return { child: kid.child, name: kid.name, th, reports, sure, maybe, total: mine.length };
+      const diag = { th, link, agree: refAgreement(kid.refs), faces: faces.length, linked: linked.size, top: faces.map((f) => f.score).sort((a, b) => b - a).slice(0, 5) };
+      return { child: kid.child, name: kid.name, th, diag, reports, sure, maybe, total: mine.length };
     });
     photoState = {
       sig: selSig(),
@@ -379,8 +386,13 @@ async function runSearch(days, kids, ui) {
       selected: new Set(groups.flatMap((g) => [...g.reports, ...g.sure].map((j) => `${g.child}:${j.img.id}`))),
     };
     drawResults(ui.results);
-    ui.status.textContent = groups.map((g) =>
-      `${givenName(g.name)}: 앨범 ${g.total}장 중 ${g.sure.length}장 + 알림장 ${g.reports.length}장 (기준선 ${g.th.sure.toFixed(2)}, 다른 얼굴 평균 ${g.th.median.toFixed(2)})`).join(' · ');
+    const f2 = (x) => (x == null ? '-' : x.toFixed(2));
+    ui.status.replaceChildren(...groups.map((g) => h('div', {},
+      `${givenName(g.name)}: 앨범 ${g.total}장 중 ${g.sure.length}장 + 알림장 ${g.reports.length}장`,
+      h('div', { class: 'diag' },
+        `진단 · 얼굴 ${g.diag.faces}개 · 기준 얼굴끼리 ${f2(g.diag.agree?.median)} (최저 ${f2(g.diag.agree?.min)}) · `
+        + `다른 얼굴 중앙값 ${f2(g.th.median)} · 기준선 ${f2(g.th.sure)} / 확인 ${f2(g.th.maybe)} · 연결 ${f2(g.diag.link)} (+${g.diag.linked}) · 최고점 ${g.diag.top.map(f2).join(', ')}`),
+    )));
   } catch (e) {
     if (e instanceof NotLoggedInError) return showLogin();
     ui.status.textContent = '오류: ' + (e.message || e);
