@@ -49,6 +49,16 @@ export const api = {
     return get(`/v1/centers/${center}/notices`, { cls, tz: TZ, page_size: 20, page });
   },
 
+  /** 아이 기준 앨범 전체 (반·기관·연도 상관없이, 추억보기와 같은 방식) */
+  childAlbums({ child, page }) {
+    return get(`/v1_3/children/${child}/albums/`, { page_size: 100, tz: TZ, child, page });
+  },
+
+  /** 아이 기준 알림장 전체 (반·기관·연도 상관없이) */
+  childReports({ child, page }) {
+    return get(`/v1_2/children/${child}/reports/`, { page_size: 100, tz: TZ, child, page });
+  },
+
   /** 앨범 한 페이지 */
   albums({ child, center, cls, page }) {
     return get(`/v1_3/children/${child}/albums/`, {

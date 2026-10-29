@@ -105,7 +105,7 @@ function drawNav() {
     return b;
   }));
   const classes = kidClasses();
-  classBar.hidden = classes.length < 2;
+  classBar.hidden = currentTab !== 'prep' || classes.length < 2;
   classBar.replaceChildren(...classes.map((e) => {
     const box = h('input', { type: 'checkbox', checked: selected.has(e.id) });
     box.onchange = async () => {
@@ -141,6 +141,7 @@ document.querySelectorAll('.tabs button').forEach((b) => {
 });
 function showTab(tab) {
   currentTab = tab;
+  classBar.hidden = tab !== 'prep' || kidClasses().length < 2;
   document.querySelectorAll('.tabs button').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.tab === tab)));
   ({ prep: showPrep, photos: showPhotos, faces: showFaces })[tab]();
 }
@@ -275,10 +276,12 @@ async function showPhotos() {
     h('option', { value: '30', selected: true }, '최근 1개월'),
     h('option', { value: '90' }, '최근 3개월'),
     h('option', { value: '180' }, '최근 6개월'),
+    h('option', { value: '365' }, '최근 1년'),
+    h('option', { value: '0' }, '전체 (예전 반·기관 포함)'),
   );
   const runBtn = h('button', { class: 'btn' }, '우리 애 사진 찾기');
   const status = h('div', { class: 'muted' },
-    `${withRefs.map((k) => givenName(k.name)).join(', ')}의 사진을 찾아요. 처음엔 사진을 하나씩 살펴봐서 시간이 걸리고, 다음부터는 새 사진만 확인해요.`);
+    `예전 반과 다른 기관 사진까지, 반과 상관없이 ${withRefs.map((k) => givenName(k.name)).join(', ')}의 사진을 찾아요. 사진을 하나씩 살펴보기 때문에 기간이 길면 오래 걸려요(1년이면 수천 장).`);
   const warn = noRefs.length
     ? h('div', { class: 'muted', style: 'margin-top:4px' }, `${noRefs.map((k) => givenName(k.name)).join(', ')}는 기준 얼굴이 부족해서 이번엔 빠져요. `,
         h('a', { href: '#', onclick: (ev) => { ev.preventDefault(); showTab('faces'); } }, '등록하기'))
@@ -292,7 +295,7 @@ async function showPhotos() {
 
 async function runSearch(days, kids, ui) {
   const { initFace, detectFaces } = await import('./lib/face.js');
-  const { refsFor, faceScore, thresholds, refAgreement, propagate, linkThreshold } = await import('./lib/match.js');
+  const { refsFor, faceScore, thresholdsBySize, refAgreement, propagate, linkThreshold } = await import('./lib/match.js');
   ui.runBtn.disabled = true;
   ui.bar.hidden = false;
   ui.results.replaceChildren();
@@ -309,21 +312,18 @@ async function runSearch(days, kids, ui) {
     const albumJobs = [];
     for (const kid of kids) {
       const seen = new Set();
-      for (const e of kid.enrollments) {
-        const args = argsOf(e);
-        for await (const r of paginate(api.reports, args, { stop: (x) => postYMD(x) < since, maxPages: 200 })) {
-          for (const img of r.attached_images || []) {
-            if (seen.has(img.id)) continue;
-            seen.add(img.id);
-            reportJobs.push({ kid, img, title: '알림장', date: postYMD(r) });
-          }
+      for await (const r of paginate(api.childReports, { child: kid.child }, { stop: (x) => postYMD(x) < since, maxPages: 100 })) {
+        for (const img of r.attached_images || []) {
+          if (seen.has(img.id)) continue;
+          seen.add(img.id);
+          reportJobs.push({ kid, img, title: '알림장', date: postYMD(r) });
         }
-        for await (const a of paginate(api.albums, args, { stop: (x) => postYMD(x) < since, maxPages: 200 })) {
-          for (const img of a.attached_images || []) {
-            if (seen.has(img.id)) continue;
-            seen.add(img.id);
-            albumJobs.push({ kid, img, title: a.title || '앨범', date: postYMD(a) });
-          }
+      }
+      for await (const a of paginate(api.childAlbums, { child: kid.child }, { stop: (x) => postYMD(x) < since, maxPages: 100 })) {
+        for (const img of a.attached_images || []) {
+          if (seen.has(img.id)) continue;
+          seen.add(img.id);
+          albumJobs.push({ kid, img, title: a.title || '앨범', date: postYMD(a) });
         }
         ui.status.textContent = `사진 목록을 모으는 중… ${reportJobs.length + albumJobs.length}장`;
       }
@@ -357,15 +357,17 @@ async function runSearch(days, kids, ui) {
       const faces = [];
       for (const j of mine) {
         const refs = refsFor(j.date, kid.refs);
-        faceMem.get(j.img.id).forEach((f, i) => faces.push({ key: `${j.img.id}:${i}`, job: j, date: j.date, emb: f.emb, score: faceScore(f.emb, refs) }));
+        faceMem.get(j.img.id).forEach((f, i) => faces.push({ key: `${j.img.id}:${i}`, job: j, date: j.date, emb: f.emb, size: f.size, score: faceScore(f.emb, refs) }));
       }
-      const th = thresholds(faces.map((f) => f.score), strictness);
-      const sureKeys = new Set(faces.filter((f) => f.score >= th.sure).map((f) => f.key));
+      const tb = thresholdsBySize(faces, strictness);
+      const thOf = (f) => (f.size < tb.cut ? tb.small : tb.large);
+      const th = tb.all;
+      const sureKeys = new Set(faces.filter((f) => f.score >= thOf(f).sure).map((f) => f.key));
       const link = linkThreshold(faces);
       const linked = propagate(faces, sureKeys, { link, floor: th.median });
       const best = new Map(); // 사진별 가장 우리 아이다운 얼굴
       for (const f of faces) {
-        const level = sureKeys.has(f.key) ? 3 : linked.has(f.key) ? 2 : f.score >= th.maybe ? 1 : 0;
+        const level = sureKeys.has(f.key) ? 3 : linked.has(f.key) ? 2 : f.score >= thOf(f).maybe ? 1 : 0;
         const prev = best.get(f.job.img.id);
         if (!prev || level > prev.level || (level === prev.level && f.score > prev.score)) best.set(f.job.img.id, { level, score: f.score });
       }
@@ -377,7 +379,7 @@ async function runSearch(days, kids, ui) {
       const sure = mine.filter((j) => j.level >= 2).sort((a, b) => b.date.localeCompare(a.date));
       const maybe = mine.filter((j) => j.level === 1).sort((a, b) => b.score - a.score).slice(0, 300);
       const reports = reportJobs.filter((j) => j.kid === kid).sort((a, b) => b.date.localeCompare(a.date));
-      const diag = { th, link, agree: refAgreement(kid.refs), faces: faces.length, linked: linked.size, top: faces.map((f) => f.score).sort((a, b) => b - a).slice(0, 5) };
+      const diag = { th, tb, small: faces.filter((f) => f.size < tb.cut).length, link, agree: refAgreement(kid.refs), faces: faces.length, linked: linked.size, top: faces.map((f) => f.score).sort((a, b) => b - a).slice(0, 5) };
       return { child: kid.child, name: kid.name, th, diag, reports, sure, maybe, total: mine.length };
     });
     photoState = {
@@ -391,7 +393,7 @@ async function runSearch(days, kids, ui) {
       `${givenName(g.name)}: 앨범 ${g.total}장 중 ${g.sure.length}장 + 알림장 ${g.reports.length}장`,
       h('div', { class: 'diag' },
         `진단 · 얼굴 ${g.diag.faces}개 · 기준 얼굴끼리 ${f2(g.diag.agree?.median)} (최저 ${f2(g.diag.agree?.min)}) · `
-        + `다른 얼굴 중앙값 ${f2(g.th.median)} · 기준선 ${f2(g.th.sure)} / 확인 ${f2(g.th.maybe)} · 연결 ${f2(g.diag.link)} (+${g.diag.linked}) · 최고점 ${g.diag.top.map(f2).join(', ')}`),
+        + `다른 얼굴 중앙값 ${f2(g.th.median)} · 기준선 큰얼굴 ${f2(g.diag.tb.large.sure)} / 작은얼굴(${g.diag.small}개) ${f2(g.diag.tb.small.sure)} · 연결 ${f2(g.diag.link)} (+${g.diag.linked}) · 최고점 ${g.diag.top.map(f2).join(', ')}`),
     )));
   } catch (e) {
     if (e instanceof NotLoggedInError) return showLogin();
@@ -610,19 +612,16 @@ async function showPicker(kid, p) {
 
   try {
     await initFace();
-    // 알림장 사진(그 아이에게 온 것) 우선, 부족하면 앨범 사진
+    // 그 시기 알림장 사진(그 아이에게 온 것) 우선, 부족하면 앨범 사진. 반·기관 상관없이 아이 기준으로 찾는다
     const photos = [];
-    const e = kid.enrollments[0];
-    const args = argsOf(e);
     const inRange = (x) => postYMD(x) >= p.start && postYMD(x) <= p.end;
-    for await (const r of paginate(api.reports, args, { stop: (x) => postYMD(x) < p.start, maxPages: 100 })) {
+    for await (const r of paginate(api.childReports, { child: kid.child }, { stop: (x) => postYMD(x) < p.start, maxPages: 100 })) {
       if (inRange(r)) for (const img of r.attached_images || []) photos.push({ img, date: postYMD(r) });
       if (photos.length >= 24) break;
     }
-    for await (const a of paginate(api.albums, args, { stop: (x) => postYMD(x) < p.start, maxPages: 100 })) {
+    for await (const a of paginate(api.childAlbums, { child: kid.child }, { stop: (x) => postYMD(x) < p.start, maxPages: 100 })) {
       if (photos.length >= 40) break;
       if (!inRange(a)) continue;
-      // 앨범마다 앞쪽 사진 몇 장만 (개인 사진이 많은 편)
       for (const img of (a.attached_images || []).slice(0, 4)) photos.push({ img, date: postYMD(a) });
     }
     if (!photos.length) return (status.textContent = '이 시기의 사진을 찾지 못했어요. 키즈노트에 이 시기 자료가 없거나, 다른 기관에 다닐 때일 수 있어요.');

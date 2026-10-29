@@ -59,6 +59,23 @@ export function thresholds(allFaceScores, strictness = 0.5) {
   return { median, mad, sure, maybe: Math.min(maybe, sure), top, n: s.length };
 }
 
+/**
+ * 얼굴 크기별로 나눠서 기준선을 정한다. 단체사진 속 작은 얼굴은 특징값이 흐려서 점수가 전반적으로 낮으므로,
+ * 큰 얼굴(독사진) 분포가 아니라 다른 작은 얼굴들과 비교해야 한다.
+ * faces: [{score, size}] → { small, large, cut } (size < cut 이면 small 기준)
+ */
+export function thresholdsBySize(faces, strictness = 0.5, cut = 90) {
+  const small = faces.filter((f) => f.size < cut).map((f) => f.score);
+  const large = faces.filter((f) => f.size >= cut).map((f) => f.score);
+  const all = thresholds(faces.map((f) => f.score), strictness);
+  return {
+    cut,
+    all,
+    small: small.length >= 60 ? thresholds(small, strictness) : all,
+    large: large.length >= 60 ? thresholds(large, strictness) : all,
+  };
+}
+
 /** 기준 얼굴끼리의 유사도 (자기 자신 제외 최댓값). 같은 아이 얼굴이 보통 몇 점인지 보는 진단용 */
 export function refAgreement(refs) {
   if (refs.length < 2) return null;

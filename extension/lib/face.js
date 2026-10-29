@@ -3,7 +3,7 @@
 // 저장하는 것은 우리 아이 기준 얼굴뿐이고, 다른 아이 얼굴은 비교 후 버린다.
 import { Human } from '../vendor/human.esm.js';
 
-const MIN_FACE_PX = 48; // 이보다 작은 얼굴은 특징값이 부정확해서 제외
+const MIN_FACE_PX = 36; // 이보다 작은 얼굴은 특징값이 너무 부정확해서 제외 (단체사진 속 얼굴은 40~80px 정도)
 
 const config = {
   modelBasePath: chrome.runtime.getURL('vendor/models/'),
