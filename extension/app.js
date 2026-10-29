@@ -254,6 +254,8 @@ async function showPrep() {
 // 판정: 1024px 사진에서 얼굴을 찾고, 사진 날짜와 가까운 시기의 기준 얼굴로 비교한 뒤
 //       이번에 확인한 모든 얼굴의 점수 분포에서 "튀게 높은" 것만 우리 아이로 본다.
 // 저장: 사진별 얼굴 점수(숫자)만 저장. 다른 아이들의 얼굴 특징값은 저장하지 않는다.
+// 한 번에 찾는 최대 기간. 사진을 한 장씩 살펴보므로 너무 길면 몇 시간이 걸리고 키즈노트 서버에도 부담이 된다
+const MAX_DAYS = 365;
 let photoState = null;
 const faceMem = new Map(); // 사진 id → 얼굴 특징값 (이 탭이 열려 있는 동안만, 저장 안 함)
 const selSig = () => [...selected].sort().join(',');
@@ -277,18 +279,17 @@ async function showPhotos() {
     h('option', { value: '90' }, '최근 3개월'),
     h('option', { value: '180' }, '최근 6개월'),
     h('option', { value: '365' }, '최근 1년'),
-    h('option', { value: '0' }, '전체 (예전 반·기관 포함)'),
   );
   const runBtn = h('button', { class: 'btn' }, '우리 애 사진 찾기');
   const status = h('div', { class: 'muted' },
-    `예전 반과 다른 기관 사진까지, 반과 상관없이 ${withRefs.map((k) => givenName(k.name)).join(', ')}의 사진을 찾아요. 사진을 하나씩 살펴보기 때문에 기간이 길면 오래 걸려요(1년이면 수천 장).`);
+    `예전 반과 다른 기관 사진까지, 반과 상관없이 ${withRefs.map((k) => givenName(k.name)).join(', ')}의 사진을 찾아요. 사진을 하나씩 살펴보기 때문에 한 번에 최대 1년까지 찾을 수 있어요.`);
   const warn = noRefs.length
     ? h('div', { class: 'muted', style: 'margin-top:4px' }, `${noRefs.map((k) => givenName(k.name)).join(', ')}는 기준 얼굴이 부족해서 이번엔 빠져요. `,
         h('a', { href: '#', onclick: (ev) => { ev.preventDefault(); showTab('faces'); } }, '등록하기'))
     : null;
   const bar = h('div', { class: 'progress', hidden: true }, h('div'));
   const results = h('div');
-  runBtn.onclick = () => runSearch(Number(period.value), withRefs, { runBtn, status, bar, results });
+  runBtn.onclick = () => runSearch(Math.min(Number(period.value) || MAX_DAYS, MAX_DAYS), withRefs, { runBtn, status, bar, results });
   render(h('div', { class: 'toolbar' }, period, runBtn), status, warn, bar, results);
   if (photoState && photoState.sig === selSig()) drawResults(results);
 }
