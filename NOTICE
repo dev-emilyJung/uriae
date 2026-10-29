@@ -1,0 +1,17 @@
+우리애 한눈에 (uriae)
+Copyright (C) 2026 EmilySoft — https://kids.emilysoft.com
+Licensed under the GNU Affero General Public License v3.0 only.
+
+This product bundles the following third-party software:
+
+1. @vladmandic/human 3.3.6 (extension/vendor/human.esm.js)
+   https://github.com/vladmandic/human
+   License: MIT
+
+2. Face models (extension/vendor/models/blazeface.*, facemesh.*, faceres.*)
+   Distributed with @vladmandic/human. See the upstream repository for the
+   origin and license of each model before commercial use.
+
+3. JSZip (extension/vendor/jszip.min.js)
+   https://github.com/Stuk/jszip
+   License: MIT or GPLv3 (dual). Used here under the MIT license.

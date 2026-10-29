@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>우리애 한눈에</title>
+  <link rel="stylesheet" href="app.css" />
+</head>
+<body>
+  <header class="top">
+    <div class="brand">
+      <img src="icons/icon48.png" alt="" width="28" height="28" />
+      <span>우리애 한눈에</span>
+    </div>
+  </header>
+
+  <div id="classBar" class="class-bar" aria-label="볼 반 선택" hidden></div>
+
+  <nav class="tabs" role="tablist">
+    <button role="tab" data-tab="prep" aria-selected="true">챙길 것</button>
+    <button role="tab" data-tab="photos" aria-selected="false">우리 애 사진</button>
+    <button role="tab" data-tab="faces" aria-selected="false">기준 얼굴</button>
+  </nav>
+
+  <main id="main">
+    <div class="state">불러오는 중…</div>
+  </main>
+
+  <footer class="foot">
+    <span>🔒 모든 처리는 이 컴퓨터 안에서만 이뤄집니다 · 키즈노트 비공식 도구</span>
+    <span>
+      <a href="https://kids.emilysoft.com" target="_blank" rel="noopener">kids.emilysoft.com</a>
+      · <a href="https://kids.emilysoft.com/#support" target="_blank" rel="noopener">☕ 후원하기</a>
+    </span>
+  </footer>
+
+  <script src="vendor/jszip.min.js"></script>
+  <script type="module" src="app.js"></script>
+</body>
+</html>

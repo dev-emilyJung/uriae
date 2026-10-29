@@ -1,0 +1,18 @@
+{
+  "name": "uriae",
+  "version": "0.1.0",
+  "private": true,
+  "description": "우리애 한눈에 — 키즈노트 준비물·일정 요약 + 우리 아이 사진만 모아받기 (비공식 크롬 확장)",
+  "homepage": "https://kids.emilysoft.com",
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "scripts": {
+    "vendor": "node scripts/vendor.mjs",
+    "test": "node --test \"tests/*.test.mjs\"",
+    "zip": "node scripts/zip.mjs"
+  },
+  "devDependencies": {
+    "@vladmandic/human": "3.3.6",
+    "jszip": "^3.10.1"
+  }
+}
