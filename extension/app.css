@@ -1,3 +1,4 @@
+[hidden] { display: none !important; }
 :root {
   --bg: #faf7f2;
   --card: #ffffff;
@@ -176,3 +177,26 @@ summary { color: var(--muted); font-size: 13px; cursor: pointer; }
 }
 .safe strong { font-size: 14px; color: var(--ok); }
 .safe span { font-size: 13px; color: var(--ink); }
+
+/* 기간별 기준 얼굴 */
+.periods { display: grid; gap: 10px; margin-top: 12px; }
+.period { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; }
+.period.need { border-color: var(--accent); background: var(--accent-soft); }
+.period-head { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; margin-bottom: 8px; }
+.period-head .count { margin-left: auto; font-weight: 800; font-size: 13px; }
+.period .refs { margin: 4px 0 10px; }
+.period .ref { width: 56px; height: 56px; }
+.faces { display: grid; grid-template-columns: repeat(auto-fill, minmax(88px, 1fr)); gap: 8px; margin-top: 14px; }
+.face { position: relative; aspect-ratio: 1; border: 3px solid transparent; border-radius: 12px; overflow: hidden; padding: 0; background: var(--line); }
+.face img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.face .check { position: absolute; right: 4px; top: 4px; width: 20px; height: 20px; border-radius: 50%; background: rgba(0,0,0,0.35); color: #fff; font-size: 12px; display: grid; place-items: center; }
+.face.sel { border-color: var(--ok); }
+.face.sel .check { background: var(--ok); }
+
+/* 1단 아이 / 2단 반 */
+.nav { max-width: 860px; width: 100%; margin: 0 auto; padding: 4px 16px 0; }
+.kid-bar { display: inline-flex; background: var(--line); border-radius: 12px; padding: 4px; gap: 4px; }
+.kid { border: 0; background: transparent; color: var(--muted); font-weight: 800; font-size: 16px; padding: 8px 22px; border-radius: 9px; }
+.kid[aria-pressed="true"] { background: var(--card); color: var(--ink); box-shadow: 0 1px 3px rgba(0,0,0,0.12); }
+.nav .class-bar { padding: 8px 0 0; max-width: none; }
+.nav .class-bar::before { content: "반"; font-size: 12px; color: var(--muted); font-weight: 700; align-self: center; margin-right: 2px; }

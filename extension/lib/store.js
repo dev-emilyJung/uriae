@@ -14,9 +14,10 @@ export const store = {
 
 // 키 이름 모음
 export const K = {
+  kid: 'currentKid', // 지금 보고 있는 아이
   selected: 'selectedClasses', // 선택한 반(소속 id) 목록. 없으면 전체 선택
   checked: 'checked', // 챙김 체크 상태 {itemKey: true}
   refs: (child) => `refs:${child}`, // 아이별 기준 얼굴 임베딩 [{id, emb:number[], thumb}]
-  scores: (child) => `scores:${child}`, // 아이별 사진 유사도 캐시 {imageId: score}
-  threshold: 'threshold', // {sure, maybe}
+  scores: (child) => `scores2:${child}`, // 아이별 사진 얼굴 점수 {sig: 기준얼굴 id 목록, map: {imageId: [얼굴별 점수]}}
+  strictness: 'strictness', // 0(많이 찾기) ~ 1(정확하게)
 };
