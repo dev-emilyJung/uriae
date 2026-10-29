@@ -256,6 +256,7 @@ async function showPrep() {
 // 저장: 사진별 얼굴 점수(숫자)만 저장. 다른 아이들의 얼굴 특징값은 저장하지 않는다.
 // 한 번에 찾는 최대 기간. 사진을 한 장씩 살펴보므로 너무 길면 몇 시간이 걸리고 키즈노트 서버에도 부담이 된다
 const MAX_DAYS = 365;
+let stopRequested = false;
 let photoState = null;
 const faceMem = new Map(); // 사진 id → 얼굴 특징값 (이 탭이 열려 있는 동안만, 저장 안 함)
 const selSig = () => [...selected].sort().join(',');
@@ -281,6 +282,7 @@ async function showPhotos() {
     h('option', { value: '365' }, '최근 1년'),
   );
   const runBtn = h('button', { class: 'btn' }, '우리 애 사진 찾기');
+  const stopBtn = h('button', { class: 'btn ghost', hidden: true, onclick: () => { stopRequested = true; stopBtn.textContent = '멈추는 중…'; } }, '중지하고 지금까지 결과 보기');
   const status = h('div', { class: 'muted' },
     `예전 반과 다른 기관 사진까지, 반과 상관없이 ${withRefs.map((k) => givenName(k.name)).join(', ')}의 사진을 찾아요. 사진을 하나씩 살펴보기 때문에 한 번에 최대 1년까지 찾을 수 있어요.`);
   const warn = noRefs.length
@@ -289,15 +291,17 @@ async function showPhotos() {
     : null;
   const bar = h('div', { class: 'progress', hidden: true }, h('div'));
   const results = h('div');
-  runBtn.onclick = () => runSearch(Math.min(Number(period.value) || MAX_DAYS, MAX_DAYS), withRefs, { runBtn, status, bar, results });
-  render(h('div', { class: 'toolbar' }, period, runBtn), status, warn, bar, results);
+  runBtn.onclick = () => runSearch(Math.min(Number(period.value) || MAX_DAYS, MAX_DAYS), withRefs, { runBtn, stopBtn, status, bar, results });
+  render(h('div', { class: 'toolbar' }, period, runBtn, stopBtn), status, warn, bar, results);
   if (photoState && photoState.sig === selSig()) drawResults(results);
 }
 
 async function runSearch(days, kids, ui) {
   const { initFace, detectFaces } = await import('./lib/face.js');
-  const { refsFor, faceScore, thresholdsBySize, refAgreement, propagate, linkThreshold } = await import('./lib/match.js');
+  const { refsFor, faceScore, thresholdsBySize, refAgreement } = await import('./lib/match.js');
+  stopRequested = false;
   ui.runBtn.disabled = true;
+  ui.stopBtn.hidden = false;
   ui.bar.hidden = false;
   ui.results.replaceChildren();
   const fill = ui.bar.firstChild;
@@ -331,25 +335,53 @@ async function runSearch(days, kids, ui) {
     }
 
     // 2) 앨범 사진 속 얼굴 찾기. 얼굴 특징값은 이 탭이 열려 있는 동안 메모리에만 두고 저장하지 않는다.
-    let done = 0, nfaces = 0;
-    const queue = albumJobs.slice();
-    const worker = async () => {
-      while (queue.length) {
-        const it = queue.shift();
-        if (!faceMem.has(it.img.id)) {
-          try {
-            faceMem.set(it.img.id, (await detectFaces(it.img.large || it.img.original)).map((f) => ({ emb: f.emb, size: f.size })));
-          } catch {
-            faceMem.set(it.img.id, []);
-          }
-        }
-        nfaces += faceMem.get(it.img.id).length;
-        done++;
-        fill.style.width = `${(done / albumJobs.length) * 100}%`;
-        ui.status.textContent = `앨범 사진 ${albumJobs.length}장 중 ${done}장 확인 · 얼굴 ${nfaces}개`;
+    //    얼굴을 찾는 동안 다음 사진 몇 장을 미리 받아 두어 다운로드 대기 시간을 줄인다.
+    const PREFETCH = 6;
+    const todo = albumJobs.filter((j) => !faceMem.has(j.img.id));
+    const total = albumJobs.length;
+    let done = total - todo.length;
+    const started = Date.now();
+    const clock = (t) => new Date(t).toLocaleTimeString('ko-KR', { hour: 'numeric', minute: '2-digit' });
+    const dur = (ms) => {
+      const m = Math.round(ms / 60000);
+      return m < 1 ? '1분 이내' : m < 60 ? `약 ${m}분` : `약 ${Math.floor(m / 60)}시간 ${m % 60}분`;
+    };
+    const progress = () => {
+      fill.style.width = `${(done / Math.max(total, 1)) * 100}%`;
+      const processed = done - (total - todo.length);
+      let eta = '예상 시간 계산 중…';
+      if (processed >= 10) {
+        const per = (Date.now() - started) / processed;
+        const left = per * (total - done);
+        eta = `예상 완료 ${clock(Date.now() + left)} (${dur(left)} 남음)`;
+      }
+      ui.status.textContent = `앨범 사진 ${total.toLocaleString('ko-KR')}장 중 ${done.toLocaleString('ko-KR')}장 확인 · 시작 ${clock(started)} · ${eta}`;
+    };
+    const urlOf = (j) => j.img.large || j.img.original;
+    const pending = new Map();
+    const want = (i) => {
+      if (i < todo.length && !pending.has(i)) {
+        pending.set(i, fetch(urlOf(todo[i])).then((r) => (r.ok ? r.blob() : null)).catch(() => null));
       }
     };
-    await Promise.all([worker(), worker()]);
+    progress();
+    for (let i = 0; i < todo.length; i++) {
+      if (stopRequested) break;
+      for (let k = i; k < i + PREFETCH; k++) want(k);
+      const blob = await pending.get(i);
+      pending.delete(i);
+      let faces = [];
+      if (blob) {
+        try { faces = (await detectFaces(blob)).map((f) => ({ emb: f.emb, size: f.size })); } catch { faces = []; }
+      }
+      faceMem.set(todo[i].img.id, faces);
+      done++;
+      progress();
+    }
+    if (stopRequested) {
+      // 중지하면 지금까지 확인한 사진만으로 판정한다
+      albumJobs.splice(0, albumJobs.length, ...albumJobs.filter((j) => faceMem.has(j.img.id)));
+    }
 
     // 3) 아이별 판정: 상위 점수 + 같은 날 사진 연결
     const strictness = await store.get(K.strictness, 0.5);
@@ -364,8 +396,9 @@ async function runSearch(days, kids, ui) {
       const thOf = (f) => (f.size < tb.cut ? tb.small : tb.large);
       const th = tb.all;
       const sureKeys = new Set(faces.filter((f) => f.score >= thOf(f).sure).map((f) => f.key));
-      const link = linkThreshold(faces);
-      const linked = propagate(faces, sureKeys, { link, floor: th.median });
+      // '같은 날 사진 연결'은 같은 교실·조명의 다른 아이까지 번져서(실측 +1252장) 사용하지 않는다
+      const link = null;
+      const linked = new Set();
       const best = new Map(); // 사진별 가장 우리 아이다운 얼굴
       for (const f of faces) {
         const level = sureKeys.has(f.key) ? 3 : linked.has(f.key) ? 2 : f.score >= thOf(f).maybe ? 1 : 0;
@@ -377,7 +410,8 @@ async function runSearch(days, kids, ui) {
         j.level = b.level;
         j.score = b.score;
       }
-      const sure = mine.filter((j) => j.level >= 2).sort((a, b) => b.date.localeCompare(a.date));
+      // 확실한 순서(점수 높은 순)로 보여줘서 어디서부터 틀리는지 바로 보이게 한다
+      const sure = mine.filter((j) => j.level >= 2).sort((a, b) => b.score - a.score);
       const maybe = mine.filter((j) => j.level === 1).sort((a, b) => b.score - a.score).slice(0, 300);
       const reports = reportJobs.filter((j) => j.kid === kid).sort((a, b) => b.date.localeCompare(a.date));
       const diag = { th, tb, small: faces.filter((f) => f.size < tb.cut).length, link, agree: refAgreement(kid.refs), faces: faces.length, linked: linked.size, top: faces.map((f) => f.score).sort((a, b) => b - a).slice(0, 5) };
@@ -391,16 +425,17 @@ async function runSearch(days, kids, ui) {
     drawResults(ui.results);
     const f2 = (x) => (x == null ? '-' : x.toFixed(2));
     ui.status.replaceChildren(...groups.map((g) => h('div', {},
-      `${givenName(g.name)}: 앨범 ${g.total}장 중 ${g.sure.length}장 + 알림장 ${g.reports.length}장`,
+      `${givenName(g.name)}: 앨범 ${g.total}장 중 ${g.sure.length}장 + 알림장 ${g.reports.length}장${stopRequested ? ' (중지한 지점까지)' : ''}`,
       h('div', { class: 'diag' },
         `진단 · 얼굴 ${g.diag.faces}개 · 기준 얼굴끼리 ${f2(g.diag.agree?.median)} (최저 ${f2(g.diag.agree?.min)}) · `
-        + `다른 얼굴 중앙값 ${f2(g.th.median)} · 기준선 큰얼굴 ${f2(g.diag.tb.large.sure)} / 작은얼굴(${g.diag.small}개) ${f2(g.diag.tb.small.sure)} · 연결 ${f2(g.diag.link)} (+${g.diag.linked}) · 최고점 ${g.diag.top.map(f2).join(', ')}`),
+        + `다른 얼굴 중앙값 ${f2(g.th.median)} · 기준선 큰얼굴 ${f2(g.diag.tb.large.sure)} / 작은얼굴(${g.diag.small}개) ${f2(g.diag.tb.small.sure)} · 최고점 ${g.diag.top.map(f2).join(', ')}`),
     )));
   } catch (e) {
     if (e instanceof NotLoggedInError) return showLogin();
     ui.status.textContent = '오류: ' + (e.message || e);
   } finally {
     ui.runBtn.disabled = false;
+    ui.stopBtn.hidden = true;
     ui.bar.hidden = true;
   }
 }
