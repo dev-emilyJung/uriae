@@ -2,4 +2,5 @@ node_modules/
 *.zip
 .DS_Store
 Thumbs.db
-site/admin.html
+site/admin-data.json
+site/admin-full.html

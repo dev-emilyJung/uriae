@@ -1,18 +1,21 @@
 #!/bin/sh
-# 방문 기록(회전된 압축 기록 포함)으로 admin.html 을 다시 만든다. cron 으로 10분마다 실행.
-# 방문자 IP 는 마지막 자리를 지워서(익명화) 집계한다.
-# 기록이 아직 없거나 분석에 실패해도 안내 페이지를 만들어서 404 가 나지 않게 한다.
+# 방문 기록(회전된 압축 기록 포함)으로 통계 파일을 다시 만든다. cron 으로 10분마다 실행.
+#  - admin-data.json : 간단한 통계 화면(admin.html)이 읽는 숫자
+#  - admin-full.html : GoAccess 전체 보고서 ("자세한 통계")
+# 방문자 IP 는 마지막 자리를 지워서(익명화) 집계한다. 관리자 페이지 방문은 빼고 센다.
 LOG_DIR=/var/log/nginx
-OUT=/var/www/uriae/admin.html
-TMP=/tmp/uriae-admin.html
+WEB=/var/www/uriae
 DATA=$(mktemp)
+OPTS="--log-format=COMBINED --anonymize-ip --ignore-crawlers"
 
-zcat -f "$LOG_DIR"/uriae.access.log* 2>/dev/null | grep -v ' "GET /admin.html' > "$DATA"
+zcat -f "$LOG_DIR"/uriae.access.log* 2>/dev/null | grep -v ' "GET /admin' > "$DATA"
 
-if [ -s "$DATA" ] && goaccess "$DATA" --log-format=COMBINED --anonymize-ip --ignore-crawlers \
-     --html-report-title="우리애 한눈에 방문 통계" -o "$TMP" > /tmp/uriae-goaccess.log 2>&1; then
-  mv "$TMP" "$OUT"
+if [ -s "$DATA" ] \
+  && goaccess "$DATA" $OPTS -o /tmp/uriae-admin.json > /tmp/uriae-goaccess.log 2>&1 \
+  && goaccess "$DATA" $OPTS --html-report-title="우리애 한눈에 방문 통계" -o /tmp/uriae-admin-full.html >> /tmp/uriae-goaccess.log 2>&1; then
+  mv /tmp/uriae-admin.json "$WEB/admin-data.json"
+  mv /tmp/uriae-admin-full.html "$WEB/admin-full.html"
 else
-  printf '<!doctype html><html lang="ko"><meta charset="utf-8"><title>방문 통계</title><body style="font-family:sans-serif;padding:40px;line-height:1.6"><h1>아직 집계할 방문 기록이 없어요</h1><p>%s 기준. 10분마다 다시 확인합니다.</p><p>계속 이 화면이면 서버에서 <code>cat /tmp/uriae-goaccess.log</code> 로 원인을 확인하세요.</p></body></html>' "$(date '+%Y-%m-%d %H:%M')" > "$OUT"
+  printf '{"general":{"date_time":"%s"}}\n' "$(date '+%Y-%m-%d %H:%M')" > "$WEB/admin-data.json"
 fi
 rm -f "$DATA"
