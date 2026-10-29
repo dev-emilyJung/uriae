@@ -32,7 +32,7 @@ sudo htpasswd -c /etc/nginx/.uriae-admin admin
 sudo cp /opt/uriae/server/update-admin.sh /usr/local/bin/uriae-update-admin
 sudo /usr/local/bin/uriae-update-admin
 # 10분마다 갱신
-echo '*/10 * * * * root /usr/local/bin/uriae-update-admin' | sudo tee /etc/cron.d/uriae-admin
+echo '*/10 * * * * root nice -n 19 ionice -c3 /usr/local/bin/uriae-update-admin' | sudo tee /etc/cron.d/uriae-admin
 ```
 
 https://uriae.emilysoft.com/admin.html 접속 → 아이디·비밀번호 입력.
