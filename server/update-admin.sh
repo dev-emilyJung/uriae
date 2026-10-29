@@ -13,6 +13,6 @@ if [ -s "$DATA" ] && goaccess "$DATA" --log-format=COMBINED --anonymize-ip --ign
      --html-report-title="우리애 한눈에 방문 통계" -o "$TMP" > /tmp/uriae-goaccess.log 2>&1; then
   mv "$TMP" "$OUT"
 else
-  printf '<!doctype html><html lang="ko"><meta charset="utf-8"><title>방문 통계</title><body style="font-family:sans-serif;padding:40px;line-height:1.6"><h1>아직 집계할 방문 기록이 없어요</h1><p>%s 기준. 10분마다 다시 확인합니다.</p><p>계속 이 화면이면 서버에서 <code>cat /tmp/uriae-goaccess.log</code> 로 원인을 확인하세요.</p></body></html>' "$(date '+%%Y-%%m-%%d %%H:%%M')" > "$OUT"
+  printf '<!doctype html><html lang="ko"><meta charset="utf-8"><title>방문 통계</title><body style="font-family:sans-serif;padding:40px;line-height:1.6"><h1>아직 집계할 방문 기록이 없어요</h1><p>%s 기준. 10분마다 다시 확인합니다.</p><p>계속 이 화면이면 서버에서 <code>cat /tmp/uriae-goaccess.log</code> 로 원인을 확인하세요.</p></body></html>' "$(date '+%Y-%m-%d %H:%M')" > "$OUT"
 fi
 rm -f "$DATA"
