@@ -66,6 +66,35 @@ async function toDataURL(canvas, box, size = 112) {
 }
 
 /**
+ * 얼굴 아래 옷 부분의 색 분포 (색상 12 × 채도 3 × 밝기 3 = 108칸, 합이 1).
+ * 같은 날 같은 옷을 입은 아이를 이어 주는 데 쓴다. 메모리에서만 쓰고 저장하지 않는다.
+ */
+function clothHistogram(canvas, box) {
+  const [x, y, w, h] = box;
+  const cx = x + w / 2;
+  const left = Math.max(0, cx - w * 0.8), right = Math.min(canvas.width, cx + w * 0.8);
+  const top = Math.min(canvas.height, y + h * 1.15), bottom = Math.min(canvas.height, y + h * 2.6);
+  if (right - left < w * 0.6 || bottom - top < h * 0.5) return null; // 옷이 사진 밖으로 잘림
+  const N = 24;
+  const t = new OffscreenCanvas(N, N);
+  const ctx = t.getContext('2d', { willReadFrequently: true });
+  ctx.drawImage(canvas, left, top, right - left, bottom - top, 0, 0, N, N);
+  const px = ctx.getImageData(0, 0, N, N).data;
+  const hist = new Array(108).fill(0);
+  for (let i = 0; i < px.length; i += 4) {
+    const r = px[i] / 255, g = px[i + 1] / 255, b = px[i + 2] / 255;
+    const max = Math.max(r, g, b), min = Math.min(r, g, b), d = max - min;
+    let hue = 0;
+    if (d) hue = max === r ? ((g - b) / d + 6) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
+    const sat = max ? d / max : 0;
+    const hb = Math.min(11, Math.floor(hue * 2)), sb = Math.min(2, Math.floor(sat * 3)), vb = Math.min(2, Math.floor(max * 3));
+    hist[hb * 9 + sb * 3 + vb]++;
+  }
+  const n = N * N;
+  return hist.map((v) => v / n);
+}
+
+/**
  * 사진 속 얼굴들의 특징값.
  * withCrops: 얼굴 고르기 화면용 작은 얼굴 이미지도 함께 (메모리에서만 사용, 저장하지 않음)
  */
@@ -82,6 +111,7 @@ export async function detectFaces(src, { withCrops = false } = {}) {
       box: f.box,
       size,
       emb: Array.from(f.embedding),
+      cloth: clothHistogram(canvas, f.box),
       crop: withCrops ? await toDataURL(canvas, f.box) : undefined,
     });
   }

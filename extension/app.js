@@ -298,7 +298,7 @@ async function showPhotos() {
 
 async function runSearch(days, kids, ui) {
   const { initFace, detectFaces } = await import('./lib/face.js');
-  const { refsFor, faceScore, thresholdsBySize, refAgreement } = await import('./lib/match.js');
+  const { refsFor, faceScore, thresholdsBySize, refAgreement, clothLink } = await import('./lib/match.js');
   stopRequested = false;
   ui.runBtn.disabled = true;
   ui.stopBtn.hidden = false;
@@ -372,7 +372,7 @@ async function runSearch(days, kids, ui) {
       pending.delete(i);
       let faces = [];
       if (blob) {
-        try { faces = (await detectFaces(blob)).map((f) => ({ emb: f.emb, size: f.size })); } catch { faces = []; }
+        try { faces = (await detectFaces(blob)).map((f) => ({ emb: f.emb, size: f.size, cloth: f.cloth })); } catch { faces = []; }
       }
       faceMem.set(todo[i].img.id, faces);
       done++;
@@ -390,15 +390,16 @@ async function runSearch(days, kids, ui) {
       const faces = [];
       for (const j of mine) {
         const refs = refsFor(j.date, kid.refs);
-        faceMem.get(j.img.id).forEach((f, i) => faces.push({ key: `${j.img.id}:${i}`, job: j, date: j.date, emb: f.emb, size: f.size, score: faceScore(f.emb, refs) }));
+        faceMem.get(j.img.id).forEach((f, i) => faces.push({ key: `${j.img.id}:${i}`, job: j, date: j.date, emb: f.emb, size: f.size, cloth: f.cloth, score: faceScore(f.emb, refs) }));
       }
       const tb = thresholdsBySize(faces, strictness);
       const thOf = (f) => (f.size < tb.cut ? tb.small : tb.large);
       const th = tb.all;
       const sureKeys = new Set(faces.filter((f) => f.score >= thOf(f).sure).map((f) => f.key));
       // '같은 날 사진 연결'은 같은 교실·조명의 다른 아이까지 번져서(실측 +1252장) 사용하지 않는다
-      const link = null;
-      const linked = new Set();
+      // 대신 옷차림 연결: 같은 날 확실한 얼굴과 옷이 같고, 얼굴도 다른 얼굴들 중간 이상으로 닮은 경우만
+      const cl = clothLink(faces, sureKeys, { minScore: th.median + 0.5 * th.mad });
+      const linked = cl.added;
       const best = new Map(); // 사진별 가장 우리 아이다운 얼굴
       for (const f of faces) {
         const level = sureKeys.has(f.key) ? 3 : linked.has(f.key) ? 2 : f.score >= thOf(f).maybe ? 1 : 0;
@@ -411,24 +412,25 @@ async function runSearch(days, kids, ui) {
         j.score = b.score;
       }
       // 확실한 순서(점수 높은 순)로 보여줘서 어디서부터 틀리는지 바로 보이게 한다
-      const sure = mine.filter((j) => j.level >= 2).sort((a, b) => b.score - a.score);
+      const sure = mine.filter((j) => j.level === 3).sort((a, b) => b.score - a.score);
+      const byCloth = mine.filter((j) => j.level === 2).sort((a, b) => b.date.localeCompare(a.date));
       const maybe = mine.filter((j) => j.level === 1).sort((a, b) => b.score - a.score).slice(0, 300);
       const reports = reportJobs.filter((j) => j.kid === kid).sort((a, b) => b.date.localeCompare(a.date));
-      const diag = { th, tb, small: faces.filter((f) => f.size < tb.cut).length, link, agree: refAgreement(kid.refs), faces: faces.length, linked: linked.size, top: faces.map((f) => f.score).sort((a, b) => b - a).slice(0, 5) };
-      return { child: kid.child, name: kid.name, th, diag, reports, sure, maybe, total: mine.length };
+      const diag = { th, tb, small: faces.filter((f) => f.size < tb.cut).length, cloth: cl.added.size, uniformDays: cl.skippedDays.length, agree: refAgreement(kid.refs), faces: faces.length, linked: linked.size, top: faces.map((f) => f.score).sort((a, b) => b - a).slice(0, 5) };
+      return { child: kid.child, name: kid.name, th, diag, reports, sure, byCloth, maybe, total: mine.length };
     });
     photoState = {
       sig: selSig(),
       groups,
-      selected: new Set(groups.flatMap((g) => [...g.reports, ...g.sure].map((j) => `${g.child}:${j.img.id}`))),
+      selected: new Set(groups.flatMap((g) => [...g.reports, ...g.sure, ...g.byCloth].map((j) => `${g.child}:${j.img.id}`))),
     };
     drawResults(ui.results);
     const f2 = (x) => (x == null ? '-' : x.toFixed(2));
     ui.status.replaceChildren(...groups.map((g) => h('div', {},
-      `${givenName(g.name)}: 앨범 ${g.total}장 중 ${g.sure.length}장 + 알림장 ${g.reports.length}장${stopRequested ? ' (중지한 지점까지)' : ''}`,
+      `${givenName(g.name)}: 앨범 ${g.total}장 중 얼굴 ${g.sure.length}장 + 옷차림 ${g.byCloth.length}장 + 알림장 ${g.reports.length}장${stopRequested ? ' (중지한 지점까지)' : ''}`,
       h('div', { class: 'diag' },
         `진단 · 얼굴 ${g.diag.faces}개 · 기준 얼굴끼리 ${f2(g.diag.agree?.median)} (최저 ${f2(g.diag.agree?.min)}) · `
-        + `다른 얼굴 중앙값 ${f2(g.th.median)} · 기준선 큰얼굴 ${f2(g.diag.tb.large.sure)} / 작은얼굴(${g.diag.small}개) ${f2(g.diag.tb.small.sure)} · 최고점 ${g.diag.top.map(f2).join(', ')}`),
+        + `다른 얼굴 중앙값 ${f2(g.th.median)} · 기준선 큰얼굴 ${f2(g.diag.tb.large.sure)} / 작은얼굴(${g.diag.small}개) ${f2(g.diag.tb.small.sure)} · 옷차림 연결 +${g.diag.cloth} (원복 날 ${g.diag.uniformDays}일 제외) · 최고점 ${g.diag.top.map(f2).join(', ')}`),
     )));
   } catch (e) {
     if (e instanceof NotLoggedInError) return showLogin();
@@ -474,13 +476,14 @@ function drawResults(container) {
       nodes.push(h('div', { class: 'grid' }, list.map((x) => tile(g, x, kind))));
     };
     block('우리 아이', '자동 선택', g.sure, 'sure');
+    block('같은 날 옷차림으로 찾은 사진', '얼굴이 확실한 사진과 같은 날, 같은 옷', g.byCloth, 'sure');
     block('알림장 사진', '선생님이 우리 아이에게 보낸 사진', g.reports, 'report');
     block('확인이 필요해요', '우리 아이가 맞으면 눌러서 선택', g.maybe, 'maybe');
-    if (multi && !g.sure.length && !g.maybe.length && !g.reports.length) {
+    if (multi && !g.sure.length && !g.byCloth.length && !g.maybe.length && !g.reports.length) {
       nodes.push(h('div', { class: 'section-label' }, givenName(g.name), h('small', {}, '찾은 사진이 없어요')));
     }
   }
-  const all = s.groups.flatMap((g) => [...g.sure, ...g.reports, ...g.maybe].map((x) => ({ g, x })));
+  const all = s.groups.flatMap((g) => [...g.sure, ...g.byCloth, ...g.reports, ...g.maybe].map((x) => ({ g, x })));
   dlBtn.onclick = () => {
     const picked = all.filter(({ g, x }) => s.selected.has(`${g.child}:${x.img.id}`))
       .map(({ g, x }) => ({ ...x, folder: multi ? givenName(g.name) : '' }));

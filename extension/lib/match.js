@@ -126,6 +126,43 @@ export function linkThreshold(faces, samples = 4000) {
   return Math.max(quantile(sims, 0.995), 0.6);
 }
 
+/** 옷 색 분포 비교 (히스토그램 교집합, 0~1) */
+export function clothSim(a, b) {
+  if (!a || !b) return 0;
+  let s = 0;
+  for (let i = 0; i < a.length; i++) s += Math.min(a[i], b[i]);
+  return s;
+}
+
+/**
+ * 옷차림 연결: 같은 날 확실한 우리 아이 얼굴의 옷과 같은 옷을 입었고, 얼굴도 어느 정도 닮은 얼굴을 찾는다.
+ * 원복처럼 반 전체가 같은 옷인 날은 연결하지 않는다(그날 얼굴의 uniformShare 이상이 같은 옷으로 잡히면).
+ * faces: [{key, date, cloth, score}]  sureKeys: Set  minScore: 얼굴 점수 하한 → { added: Set, skippedDays: [] }
+ */
+export function clothLink(faces, sureKeys, { minScore, same = 0.72, uniformShare = 0.3 } = {}) {
+  const byDay = new Map();
+  for (const f of faces) {
+    if (!byDay.has(f.date)) byDay.set(f.date, []);
+    byDay.get(f.date).push(f);
+  }
+  const added = new Set();
+  const skippedDays = [];
+  for (const [day, list] of byDay) {
+    const anchors = list.filter((f) => sureKeys.has(f.key) && f.cloth);
+    if (!anchors.length) continue;
+    const others = list.filter((f) => !sureKeys.has(f.key) && f.cloth);
+    if (!others.length) continue;
+    const match = others.map((f) => ({ f, sim: Math.max(...anchors.map((a) => clothSim(f.cloth, a.cloth))) }));
+    const sameCloth = match.filter((m) => m.sim >= same);
+    if (sameCloth.length / others.length > uniformShare && sameCloth.length > 3) {
+      skippedDays.push(day); // 원복·단체복 날로 보고 건너뜀
+      continue;
+    }
+    for (const m of sameCloth) if (m.f.score >= minScore) added.add(m.f.key);
+  }
+  return { added, skippedDays };
+}
+
 /** 생년월일 기준 6개월 단위 기간 목록 (최근 maxYears 년) */
 export function agePeriods(birthYMD, todayYMD, maxYears = 3) {
   const out = [];

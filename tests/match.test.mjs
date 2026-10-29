@@ -53,3 +53,21 @@ test('같은 날 사진 연결: 확실한 얼굴과 아주 닮은 같은 날 얼
   const added = propagate(faces, new Set(['a']), { link: 0.95, floor: 0.5 });
   assert.deepEqual([...added], ['b']);
 });
+
+test('옷차림 연결: 같은 날 같은 옷만, 원복 날은 건너뜀', async () => {
+  const { clothLink } = await import('../extension/lib/match.js');
+  const red = [1, 0, 0], blue = [0, 1, 0], uniform = [0, 0, 1];
+  const day1 = [
+    { key: 'a', date: 'd1', cloth: red, score: 0.9 },   // 확실한 얼굴
+    { key: 'b', date: 'd1', cloth: red, score: 0.7 },   // 같은 옷 + 얼굴 꽤 닮음 → 추가
+    { key: 'c', date: 'd1', cloth: red, score: 0.5 },   // 같은 옷이지만 얼굴이 안 닮음 → 제외
+    ...Array.from({ length: 8 }, (_, i) => ({ key: 'x' + i, date: 'd1', cloth: blue, score: 0.7 })),
+  ];
+  const day2 = [
+    { key: 'u', date: 'd2', cloth: uniform, score: 0.9 },
+    ...Array.from({ length: 8 }, (_, i) => ({ key: 'y' + i, date: 'd2', cloth: uniform, score: 0.7 })), // 반 전체 같은 옷
+  ];
+  const r = clothLink([...day1, ...day2], new Set(['a', 'u']), { minScore: 0.6 });
+  assert.deepEqual([...r.added], ['b']);
+  assert.deepEqual(r.skippedDays, ['d2']);
+});
