@@ -3,131 +3,136 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>우리애 한눈에 — 키즈노트, 우리 애 것만 한눈에</title>
-  <meta name="description" content="준비물은 한눈에, 우리 아이 사진만 골라서 한 번에. 아이 사진과 정보는 어디로도 보내지 않는 무료 크롬 확장 프로그램." />
+  <title>우리애 한눈에</title>
+  <meta name="description" content="키즈노트 알림장과 공지에서 준비물만 뽑아 정리하고, 앨범에서 우리 아이 사진만 골라 받는 무료 크롬 확장 프로그램. 아이 사진과 정보는 어디로도 보내지 않습니다." />
   <meta property="og:title" content="우리애 한눈에" />
-  <meta property="og:description" content="키즈노트, 우리 애 것만 한눈에. 준비물 요약 + 우리 아이 사진만 모아받기. 무료, 사진은 어디로도 보내지 않아요." />
+  <meta property="og:description" content="키즈노트 알림, 우리 아이 것만 남깁니다. 준비물 정리와 우리 아이 사진 모아받기. 무료, 사진은 어디로도 보내지 않아요." />
   <meta property="og:image" content="https://uriae.emilysoft.com/icon.png" />
   <meta property="og:url" content="https://uriae.emilysoft.com/" />
   <link rel="icon" href="favicon.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&family=IBM+Plex+Sans+KR:wght@400;600&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
   <div class="wrap">
     <header class="top">
-      <a class="brand" href="./"><img src="icon.png" width="32" height="32" alt="" />우리애 한눈에</a>
-      <nav class="top-links">
-        <a href="#features">기능</a>
-        <a href="#how">사용법</a>
+      <a class="brand" href="./"><img src="icon.png" width="28" height="28" alt="" />우리애 한눈에</a>
+      <nav>
+        <a href="#what">하는 일</a>
+        <a href="#how">설치</a>
         <a href="#faq">자주 묻는 질문</a>
         <a href="#support">후원</a>
       </nav>
     </header>
 
     <div class="hero">
-      <img src="icon.png" width="96" height="96" alt="우리애 한눈에 아이콘" />
-      <h1>키즈노트,<br /><em>우리 애 것만</em> 한눈에</h1>
-      <p>준비물은 놓치지 않게 정리해 드리고,<br />앨범 속 우리 아이 사진만 골라서 한 번에 받아요.</p>
-      <div class="cta">
+      <h1>키즈노트 알림,<br />우리 아이 것만 남깁니다</h1>
+      <p class="lead">긴 알림장에서 준비물만 뽑아 체크리스트로 만들고, 수천 장 앨범에서 우리 아이가 나온 사진만 골라 한 번에 받습니다.</p>
+      <div class="actions">
         <!-- 웹스토어 등록 후 href 교체하고 aria-disabled 제거 -->
-        <a class="btn primary" href="#" aria-disabled="true">Chrome에 추가 (준비 중)</a>
-        <a class="btn ghost" href="https://github.com/dev-emilyJung/uriae" target="_blank" rel="noopener">소스 코드 보기</a>
+        <a class="btn" href="#" aria-disabled="true">Chrome에 추가 (준비 중)</a>
+        <span class="sub">무료, PC의 크롬·엣지·웨일에서 사용</span>
       </div>
-      <div class="note">완전 무료 · PC의 크롬, 엣지, 웨일에서 사용</div>
+
+      <div class="demo" aria-label="알림장이 체크리스트로 바뀌는 예시">
+        <div class="notice">
+          <span class="from">예시 알림장</span>
+          안녕하세요, 어머님 아버님. <mark>다음 주 수요일(28일)</mark>은 과학관으로 현장학습을 다녀오는 날입니다. 즐거운 견학이 될 수 있도록 준비물을 확인하시고 꼭 챙겨 주시기 바랍니다.
+          <mark>원복</mark>, <mark>편한 운동화</mark>, <mark>끈 있는 물통</mark>(물은 반만 담아 주세요). 점심은 원에서 먹고 출발하며, 도보 등원 유아는 <mark>9시 30분까지</mark> 늦지 않게 등원시켜 주시면 감사하겠습니다.
+        </div>
+        <div class="arrow" aria-hidden="true">→</div>
+        <div class="result">
+          <h2>수요일 10/28 현장학습</h2>
+          <div class="when">D-1, 내일 챙길 것</div>
+          <ul>
+            <li>원복</li>
+            <li>편한 운동화</li>
+            <li>끈 있는 물통 (물은 반만)</li>
+          </ul>
+          <div class="deadline"><b>9시 30분까지</b> 등원</div>
+        </div>
+      </div>
     </div>
 
-    <div class="safe">
-      <div class="lock">🔒</div>
-      <h2>우리 아이 사진과 정보는 어디로도 보내지 않아요</h2>
+    <div class="promise">
+      <p class="big">우리 아이 사진과 정보는 어디로도 보내지 않습니다.</p>
       <ul>
-        <li>서버 없음</li>
-        <li>회원가입 없음</li>
-        <li>비밀번호 안 받음</li>
-        <li>개발자도 볼 수 없음</li>
+        <li>사진을 받는 서버가 없습니다</li>
+        <li>회원가입이 없습니다</li>
+        <li>키즈노트 비밀번호를 묻지 않습니다</li>
+        <li>만든 사람도 여러분의 사진을 볼 수 없습니다</li>
       </ul>
-      <p>모든 작업은 여러분의 컴퓨터 안에서만 끝나요. 단체사진 속 다른 친구들의 얼굴은 비교하자마자 바로 지우고, 어디에도 남기지 않아요. 코드는 전부 공개되어 있어 누구나 확인할 수 있어요.</p>
+      <p class="fine">모든 작업은 여러분 컴퓨터 안에서 끝납니다. 단체사진에 함께 나온 친구들의 얼굴은 비교하는 순간에만 쓰고 바로 버립니다. 코드는 모두 공개되어 있어 누구나 <a href="https://github.com/dev-emilyJung/uriae">직접 확인</a>할 수 있습니다.</p>
     </div>
 
-    <section id="features">
-      <h2>메뉴는 딱 세 개</h2>
-      <p class="sub">쏟아지는 알림 속에서 정말 필요한 것만 남겼어요.</p>
-      <div class="features">
-        <div class="card">
-          <div class="emoji">🎒</div>
-          <h3>챙길 것</h3>
-          <p>알림장과 공지에서 준비물·복장·제출 마감을 뽑아 오늘, 내일, 이번 주로 정리해요. 체크하면서 하나씩 챙기세요.</p>
-        </div>
-        <div class="card">
-          <div class="emoji">📷</div>
-          <h3>우리 애 사진</h3>
-          <p>단체사진까지 살펴서 우리 아이가 나온 사진만 골라요. 하나씩 누를 필요 없이 ZIP 파일 하나로 한 번에 받아요.</p>
-        </div>
-        <div class="card">
-          <div class="emoji">🙂</div>
-          <h3>기준 얼굴</h3>
-          <p>아이 사진 몇 장만 등록하면 끝. 형제자매도 아이별로 따로 찾아드려요. 정규반과 방과후반도 함께 봐요.</p>
-        </div>
-      </div>
+    <section class="part col" id="what">
+      <h2>하는 일은 세 가지입니다</h2>
+      <dl class="what">
+        <dt>챙길 것</dt>
+        <dd>알림장과 공지에서 준비물, 복장, 신청서 마감을 뽑아 오늘·내일·이번 주로 나눠 보여줍니다. 원문도 바로 옆에서 확인할 수 있습니다.</dd>
+        <dt>우리 아이 사진</dt>
+        <dd>앨범과 알림장 사진을 살펴 우리 아이가 나온 사진만 고릅니다. 단체사진도 포함됩니다. 하나씩 누를 필요 없이 ZIP 파일 하나로 받습니다.</dd>
+        <dt>기준 얼굴</dt>
+        <dd>아이 얼굴은 금방 바뀌기 때문에 6개월 단위로 두 장씩 등록합니다. 그 시기 알림장 사진 속 얼굴을 눌러서 고르면 됩니다.</dd>
+      </dl>
     </section>
 
-    <section id="how">
-      <h2>이렇게 써요</h2>
-      <p class="sub">설치부터 첫 사용까지 3분이면 충분해요.</p>
-      <ol class="steps">
-        <li><b>Chrome에 추가</b> 버튼으로 설치해요.</li>
-        <li>PC에서 <a href="https://www.kidsnote.com" target="_blank" rel="noopener">키즈노트 웹</a>에 평소처럼 로그인해요.</li>
-        <li>브라우저 오른쪽 위의 🙂 아이콘을 눌러요.</li>
-        <li><b>기준 얼굴</b>에 우리 아이 사진을 5~10장 등록해요.</li>
-        <li><b>챙길 것</b>에서 준비물을 확인하고, <b>우리 애 사진</b>에서 사진을 받아요.</li>
+    <section class="part col" id="how">
+      <h2>설치하고 쓰는 순서</h2>
+      <ol class="how">
+        <li>위의 <b>Chrome에 추가</b> 버튼으로 설치합니다.</li>
+        <li>PC에서 <a href="https://www.kidsnote.com">키즈노트 웹</a>에 평소처럼 로그인합니다.</li>
+        <li>브라우저 오른쪽 위의 우리애 한눈에 아이콘을 누릅니다.</li>
+        <li>기준 얼굴에서 아이 얼굴을 시기별로 두 장씩 고릅니다.</li>
+        <li>챙길 것에서 준비물을 확인하고, 우리 아이 사진에서 사진을 받습니다.</li>
       </ol>
+      <p style="color:var(--soft);font-size:15px">아이가 둘 이상이거나 정규반과 방과후반에 함께 다녀도, 아이별·반별로 나눠 볼 수 있습니다.</p>
     </section>
 
-    <section id="faq">
+    <section class="part col faq" id="faq">
       <h2>자주 묻는 질문</h2>
-      <details class="faq">
+      <details>
         <summary>키즈노트에서 만든 건가요?</summary>
-        <p>아니요. 한 부모 개발자가 직접 쓰려고 만든 비공식 도구예요. 키즈노트(주)와는 관련이 없어요.</p>
+        <p>아니요. 아이를 키우는 부모 개발자가 직접 쓰려고 만든 비공식 도구입니다. 키즈노트(주)와는 관련이 없습니다.</p>
       </details>
-      <details class="faq">
-        <summary>키즈노트 비밀번호를 입력해야 하나요?</summary>
-        <p>아니요. 이미 로그인된 키즈노트 웹을 그대로 이용해요. 비밀번호는 묻지도, 저장하지도 않아요.</p>
-      </details>
-      <details class="faq">
+      <details>
         <summary>우리 아이 사진이 어딘가에 올라가지 않나요?</summary>
-        <p>어디에도 올라가지 않아요. 사진을 고르는 작업은 여러분 컴퓨터 안에서만 이뤄지고, 이 서비스에는 사진을 받을 서버 자체가 없어요. 저장되는 건 우리 아이 기준 얼굴 정보와 체크 상태뿐이고, 그것도 여러분 브라우저 안에만 있어요.</p>
+        <p>올라가지 않습니다. 사진을 고르는 작업은 여러분 컴퓨터 안에서만 이뤄지고, 이 서비스에는 사진을 받을 서버 자체가 없습니다. 저장되는 것은 우리 아이 기준 얼굴과 체크 상태뿐이며, 그것도 여러분 브라우저 안에만 있습니다.</p>
       </details>
-      <details class="faq">
+      <details>
         <summary>단체사진 속 다른 아이들은요?</summary>
-        <p>우리 아이인지 비교하는 순간에만 쓰고 바로 버려요. 다른 아이들의 얼굴 정보는 저장하지 않아요.</p>
+        <p>우리 아이인지 비교하는 순간에만 쓰고 바로 버립니다. 다른 아이들의 얼굴 정보는 저장하지 않습니다.</p>
       </details>
-      <details class="faq">
+      <details>
         <summary>휴대폰에서도 되나요?</summary>
-        <p>지금은 PC의 크롬, 엣지, 웨일 브라우저에서만 돼요. 모바일 브라우저는 확장 프로그램을 지원하지 않아요.</p>
+        <p>지금은 PC의 크롬, 엣지, 웨일 브라우저에서만 됩니다. 모바일 브라우저는 확장 프로그램을 지원하지 않습니다.</p>
       </details>
-      <details class="faq">
-        <summary>준비물을 다 찾아주나요?</summary>
-        <p>문장 규칙으로 찾기 때문에 놓치는 게 있을 수 있어요. 그래서 원문을 항상 함께 보여드려요. 중요한 안내는 원문도 한 번 확인해 주세요.</p>
+      <details>
+        <summary>준비물을 빠짐없이 찾아주나요?</summary>
+        <p>문장 규칙으로 찾기 때문에 놓치는 항목이 있을 수 있습니다. 그래서 원문을 항상 함께 보여줍니다. 중요한 안내는 원문도 한 번 확인해 주세요.</p>
       </details>
-      <details class="faq">
+      <details>
+        <summary>사진이 잘못 골라지면요?</summary>
+        <p>애매한 사진은 따로 모아 보여주니 직접 골라 주세요. 다른 아이가 섞이면 기준 얼굴 화면에서 찾는 기준을 "정확하게" 쪽으로 옮기면 됩니다.</p>
+      </details>
+      <details>
         <summary>정말 무료인가요?</summary>
-        <p>네, 모든 기능이 무료예요. 도움이 되셨다면 아래에서 커피 한 잔으로 응원해 주세요.</p>
+        <p>네. 모든 기능이 무료이고 광고도 없습니다.</p>
       </details>
     </section>
 
-    <section id="support" class="support">
-      <h2>☕ 커피 한 잔으로 응원하기</h2>
-      <p>광고도 유료 기능도 없어요. 여러분의 응원이 계속 만드는 힘이 돼요.</p>
-      <div class="cta">
-        <!-- 토스아이디 링크 받으면 href 교체하고 aria-disabled 제거 -->
-        <a class="btn primary" href="#" aria-disabled="true">토스로 후원하기 (준비 중)</a>
-        <a class="btn ghost" href="https://github.com/dev-emilyJung/uriae" target="_blank" rel="noopener">GitHub에 ⭐ 누르기</a>
-      </div>
+    <section class="part col support" id="support">
+      <h2>응원하기</h2>
+      <p>도움이 되셨다면 GitHub에 별을 눌러 주세요. 별이 많을수록 다른 부모님들이 찾기 쉬워집니다.</p>
+      <a class="btn" href="https://github.com/dev-emilyJung/uriae">GitHub에서 별 누르기</a>
     </section>
 
     <footer class="foot">
       <div class="row">
-        <span>© 2026 EmilySoft · 최초 공개 2026-10-29 · <a href="https://github.com/dev-emilyJung/uriae/blob/main/LICENSE">AGPL-3.0</a></span>
-        <span><a href="privacy.html">개인정보처리방침</a> · <a href="mailto:emilyjung@emilysoft.com">문의</a></span>
+        <span>© 2026 EmilySoft. 2026년 10월 29일 처음 공개. <a href="https://github.com/dev-emilyJung/uriae/blob/main/LICENSE">AGPL-3.0</a></span>
+        <span><a href="privacy.html">개인정보처리방침</a> <a href="mailto:emilyjung@emilysoft.com" style="margin-left:14px">문의하기</a></span>
       </div>
       <p>우리애 한눈에는 키즈노트(주)와 제휴하거나 승인받지 않은 비공식 도구이며, "키즈노트"는 해당 회사의 상표입니다. 본인 계정, 본인 자녀의 자료를 개인적으로 보관하는 용도로만 사용해 주세요.</p>
     </footer>
