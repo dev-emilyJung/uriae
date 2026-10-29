@@ -1,9 +1,9 @@
 {
   "manifest_version": 3,
-  "name": "우리애 한눈에 - 키즈노트 도우미 (비공식)",
+  "name": "우리애 한눈에",
   "short_name": "우리애 한눈에",
   "version": "0.1.0",
-  "description": "키즈노트의 준비물·일정을 한눈에, 우리 아이 사진만 골라서 한 번에. 모든 처리는 내 컴퓨터 안에서만.",
+  "description": "준비물·일정은 한눈에, 우리 아이 사진만 골라서 한 번에. 키즈노트 웹과 함께 쓰는 비공식 도구. 모든 처리는 내 컴퓨터 안에서만.",
   "homepage_url": "https://kids.emilysoft.com",
   "icons": {
     "16": "icons/icon16.png",
@@ -16,7 +16,10 @@
   "background": {
     "service_worker": "background.js"
   },
-  "permissions": ["storage", "unlimitedStorage"],
+  "permissions": [
+    "storage",
+    "unlimitedStorage"
+  ],
   "host_permissions": [
     "https://kapi.kidsnote.com/*",
     "https://www.kidsnote.com/*",
