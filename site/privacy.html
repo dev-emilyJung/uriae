@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>개인정보처리방침 — 우리애 한눈에</title>
+  <link rel="icon" href="favicon.png" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="wrap">
+    <header class="top">
+      <a class="brand" href="./"><img src="icon.png" width="32" height="32" alt="" />우리애 한눈에</a>
+    </header>
+
+    <article class="doc">
+      <h1>개인정보처리방침</h1>
+      <p>시행일: 2026년 10월 29일</p>
+
+      <p><b>요약: 우리애 한눈에(이하 "확장 프로그램")는 이용자의 어떤 정보도 개발자나 제3자에게 보내지 않습니다.</b>
+        확장 프로그램에는 이용자 정보를 받는 서버가 없고, 모든 처리는 이용자의 컴퓨터와 브라우저 안에서만 이뤄집니다.</p>
+
+      <h2>1. 확장 프로그램이 읽는 정보</h2>
+      <p>확장 프로그램은 이용자가 이미 로그인한 키즈노트 웹(kidsnote.com)의 세션을 이용해, 이용자 본인 계정으로 볼 수 있는 다음 정보를 읽어옵니다.</p>
+      <ul>
+        <li>자녀 이름, 소속 기관과 반 이름</li>
+        <li>알림장과 공지사항의 본문</li>
+        <li>앨범과 알림장에 첨부된 사진</li>
+      </ul>
+      <p>이 정보는 화면에 보여주고 준비물을 정리하고 사진을 고르는 데에만 쓰며, 외부로 전송하지 않습니다. 키즈노트 아이디와 비밀번호는 묻지도, 저장하지도 않습니다.</p>
+
+      <h2>2. 이용자 브라우저에 저장하는 정보</h2>
+      <table>
+        <tr><th>항목</th><th>내용</th><th>목적</th></tr>
+        <tr><td>기준 얼굴 정보</td><td>이용자가 등록한 자녀 사진에서 계산한 얼굴 특징값(숫자 목록)과 작은 얼굴 썸네일</td><td>사진 속 자녀를 찾기 위해</td></tr>
+        <tr><td>사진 점수</td><td>확인한 사진의 번호와 유사도 점수</td><td>같은 사진을 다시 확인하지 않기 위해</td></tr>
+        <tr><td>체크 상태·설정</td><td>준비물 체크 여부, 선택한 반, 찾는 기준값</td><td>다음에 열었을 때 이어서 쓰기 위해</td></tr>
+      </table>
+      <p>위 정보는 이용자 브라우저의 확장 프로그램 저장소(chrome.storage.local)에만 저장되며, 개발자를 포함한 누구에게도 전송되지 않습니다.</p>
+
+      <h2>3. 다른 아이들의 정보</h2>
+      <p>단체사진에 함께 나온 다른 아이들의 얼굴은 자녀와 비교하는 순간에만 메모리에서 처리하고 즉시 버립니다. 다른 아이들의 얼굴 정보는 저장하지 않습니다.</p>
+
+      <h2>4. 외부 전송과 제3자 제공</h2>
+      <p>확장 프로그램은 이용자 정보를 판매하거나, 제3자에게 제공하거나, 광고·분석 목적으로 사용하지 않습니다. 분석 도구와 광고를 포함하지 않습니다.
+        확장 프로그램이 통신하는 곳은 정보를 읽어오기 위한 키즈노트 서버(kapi.kidsnote.com)와 사진 저장 서버(up-kids-kage.kakao.com)뿐입니다.</p>
+
+      <h2>5. 정보 삭제</h2>
+      <ul>
+        <li>확장 프로그램의 <b>기준 얼굴</b> 탭에서 "데이터 모두 지우기"를 누르면 해당 자녀의 기준 얼굴 정보와 사진 점수가 삭제됩니다.</li>
+        <li>확장 프로그램을 브라우저에서 삭제하면 저장된 모든 정보가 함께 삭제됩니다.</li>
+      </ul>
+
+      <h2>6. 내려받은 사진</h2>
+      <p>"ZIP으로 받기"로 내려받은 사진은 이용자 컴퓨터의 다운로드 폴더에 저장되며, 이후 관리는 이용자의 책임입니다. 내려받은 자료는 본인과 가족의 개인적인 보관 용도로만 사용해 주세요.</p>
+
+      <h2>7. 변경과 문의</h2>
+      <p>이 방침이 바뀌면 이 페이지에 시행일과 함께 알립니다. 문의는 <a href="mailto:emilyjung@emilysoft.com">emilyjung@emilysoft.com</a>으로 보내주세요.</p>
+      <p>확장 프로그램의 소스 코드는 <a href="https://github.com/dev-emilyJung/uriae">GitHub</a>에 공개되어 있어 누구나 위 내용을 직접 확인할 수 있습니다.</p>
+      <p>운영: EmilySoft (uriae.emilysoft.com)</p>
+    </article>
+
+    <footer class="foot">
+      <div class="row">
+        <span>© 2026 EmilySoft</span>
+        <span><a href="./">홈으로</a></span>
+      </div>
+    </footer>
+  </div>
+</body>
+</html>
