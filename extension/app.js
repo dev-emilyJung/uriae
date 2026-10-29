@@ -85,13 +85,15 @@ async function boot() {
   showTab('prep');
 }
 
-// 1단: 아이 고르기 (한 번에 한 아이) / 2단: 그 아이의 반 켜고 끄기
+// 아이 고르기(오른쪽 위) → 아이 이름 제목 → 그 아이의 반 체크박스
 function drawNav() {
   const kids = kidsOf(enrollments);
+  const kid = kids.find((k) => k.child === currentKid);
+  document.getElementById('kidName').textContent = kid ? kid.name : '';
   const kidBar = document.getElementById('kidBar');
   kidBar.hidden = kids.length < 2;
   kidBar.replaceChildren(...kids.map((k) => {
-    const b = h('button', { class: 'kid', 'aria-pressed': String(k.child === currentKid) }, givenName(k.name));
+    const b = h('button', { role: 'tab', 'aria-selected': String(k.child === currentKid) }, givenName(k.name));
     b.onclick = async () => {
       if (k.child === currentKid) return;
       currentKid = k.child;
@@ -105,17 +107,18 @@ function drawNav() {
   const classes = kidClasses();
   classBar.hidden = classes.length < 2;
   classBar.replaceChildren(...classes.map((e) => {
-    const b = h('button', { class: 'chip', 'aria-pressed': String(selected.has(e.id)), title: e.class_name }, shortClass(e.class_name));
-    b.onclick = async () => {
-      if (selected.has(e.id)) {
-        if (selectedEnrollments().length === 1) return; // 반은 최소 하나
-        selected.delete(e.id);
-      } else selected.add(e.id);
-      b.setAttribute('aria-pressed', String(selected.has(e.id)));
+    const box = h('input', { type: 'checkbox', checked: selected.has(e.id) });
+    box.onchange = async () => {
+      if (!box.checked && selectedEnrollments().length === 1) {
+        box.checked = true; // 반은 최소 하나
+        return;
+      }
+      if (box.checked) selected.add(e.id);
+      else selected.delete(e.id);
       await store.set(K.selected, [...selected]);
       if (currentTab !== 'faces') showTab(currentTab);
     };
-    return b;
+    return h('label', { title: e.class_name }, box, shortClass(e.class_name));
   }));
 }
 
@@ -189,19 +192,19 @@ async function showPrep() {
   const multi = list.length > 1;
 
   const save = () => store.set(K.checked, checked);
-  const cardView = (c) => {
+  const cardView = (c, showDday = true) => {
     const d = daysBetween(t, c.date);
     const dday = d === 0 ? '오늘' : d === 1 ? '내일' : d > 0 ? `D-${d}` : `${-d}일 전`;
     const keys = c.prep.map((_, i) => `${c.key}#${i}`);
     const el = h('article', { class: 'card' + (keys.length && keys.every((k) => checked[k]) ? ' done' : '') },
       h('div', { class: 'card-head' },
-        h('span', { class: 'dday' }, dday),
+        showDday ? h('span', { class: 'dday' }, dday) : null,
         h('span', { class: 'date' }, dateLabel(c.date) + (c.dateGuessed ? ' · 글 작성일' : '')),
         multi ? c.who.map((w) => h('span', { class: 'who' }, w)) : null,
         h('span', { class: 'badge' }, c.source === 'notice' ? '공지' : '알림장'),
       ),
       c.title ? h('h3', {}, c.title) : null,
-      c.events.length ? h('div', { class: 'event' }, '📅 ' + c.events[0]) : null,
+      c.events.length && !c.events[0].includes(c.title.replace('…', '')) ? h('div', { class: 'event' }, c.events[0]) : null,
       c.prep.length
         ? h('ul', { class: 'items' }, c.prep.map((p, i) => {
             const k = keys[i];
@@ -221,22 +224,22 @@ async function showPrep() {
             return li;
           }))
         : null,
-      c.times.length ? h('div', { class: 'time' }, '⏰ ' + c.times[0]) : null,
+      c.times.length ? h('div', { class: 'time' }, h('b', {}, '시간 '), c.times[0]) : null,
       h('details', {}, h('summary', {}, '원문 보기'), h('div', { class: 'raw' }, c.content)),
     );
     return el;
   };
 
   const out = [];
-  out.push(h('div', { class: 'hero' },
-    h('span', { class: 'big' }, left ? `${left}개` : '준비 끝!'),
-    h('span', {}, left ? '오늘·내일 챙길 것이 남았어요' : upcoming.length ? '오늘·내일 챙길 것은 모두 체크했어요' : '다가오는 준비물 안내가 없어요'),
+  out.push(h('p', { class: 'summary' },
+    left ? h('span', {}, '오늘·내일 챙길 것 ', h('mark', {}, `${left}개`), '가 남았어요')
+      : upcoming.length ? '오늘·내일 챙길 것은 모두 체크했어요' : '다가오는 준비물 안내가 없어요',
   ));
   for (const [name, fn] of groups) {
     const g = upcoming.filter(fn);
     if (!g.length) continue;
     out.push(h('div', { class: 'group-title' }, name, h('small', {}, `${g.length}건`)));
-    g.forEach((c) => out.push(cardView(c)));
+    g.forEach((c) => out.push(cardView(c, name !== '오늘' && name !== '내일')));
   }
   if (past.length) {
     out.push(h('details', { class: 'past' }, h('summary', {}, `지난 7일 안내 ${past.length}건`), past.map(cardView)));
@@ -478,7 +481,7 @@ async function downloadZip(list, btn) {
     btn.textContent = failed ? `완료 (${failed}장 실패)` : '다운로드 완료';
   } catch (e) {
     btn.textContent = '다시 시도';
-    main.prepend(h('div', { class: 'hero', style: 'background:var(--warn-soft)' }, '다운로드 중 오류: ' + (e.message || e)));
+    main.prepend(h('p', { class: 'error' }, '다운로드 중 오류가 났어요: ' + (e.message || e)))
   } finally {
     btn.disabled = false;
   }

@@ -173,7 +173,7 @@ export function buildCards(posts) {
       postDate: p.date,
       date: r.date || p.date,
       dateGuessed: !r.date,
-      title: p.title || firstLine(p.content),
+      title: p.title || bracketTitle(p.content) || shorten(r.events[0]) || firstLine(p.content),
       prep: r.prep,
       events: r.events,
       times: r.times,
@@ -182,6 +182,18 @@ export function buildCards(posts) {
   }
   cards.sort((a, b) => a.date.localeCompare(b.date));
   return cards;
+}
+
+/** "[생일파티 안내] ..." 처럼 대괄호로 시작하는 제목 */
+function bracketTitle(s = '') {
+  const m = s.trim().match(/^\[([^\]]{2,30})\]/);
+  return m ? m[1].trim() : '';
+}
+/** 일정 문장을 제목으로 쓸 때: 인사말·끝맺음 정리 */
+function shorten(s) {
+  if (!s) return '';
+  const t = s.replace(/^\[[^\]]*\]\s*/, '').replace(/\s*(입니다|있습니다|예정입니다|진행됩니다)[.!~]*$/, '').trim();
+  return t.length > 40 ? t.slice(0, 40) + '…' : t;
 }
 
 function firstLine(s = '') {

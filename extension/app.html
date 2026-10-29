@@ -9,14 +9,15 @@
 <body>
   <header class="top">
     <div class="brand">
-      <img src="icons/icon48.png" alt="" width="28" height="28" />
+      <img src="icons/icon48.png" alt="" width="24" height="24" />
       <span>우리애 한눈에</span>
     </div>
+    <div id="kidBar" class="kid-switch" role="tablist" aria-label="아이 선택" hidden></div>
   </header>
 
-  <div class="nav">
-    <div id="kidBar" class="kid-bar" aria-label="아이 선택" hidden></div>
-    <div id="classBar" class="class-bar" aria-label="반 선택" hidden></div>
+  <div class="context">
+    <h1 id="kidName"></h1>
+    <div id="classBar" class="classes" aria-label="볼 반" hidden></div>
   </div>
 
   <nav class="tabs" role="tablist">
@@ -31,14 +32,11 @@
 
   <footer class="foot">
     <div class="safe">
-      <strong>🔒 우리 아이 사진과 정보는 어디로도 보내지 않아요</strong>
-      <span>서버 없음 · 회원가입 없음 · 비밀번호 안 받음. 모든 작업은 지금 이 컴퓨터 안에서만 끝나요.</span>
+      <strong>우리 아이 사진과 정보는 어디로도 보내지 않아요.</strong>
+      <span>서버 없음, 회원가입 없음, 비밀번호 안 받음. 모든 작업은 지금 이 컴퓨터 안에서만 끝나요.</span>
     </div>
     <span>키즈노트 비공식 도구</span>
-    <span>
-      <a href="https://uriae.emilysoft.com" target="_blank" rel="noopener">uriae.emilysoft.com</a>
-      · <a href="https://uriae.emilysoft.com/#support" target="_blank" rel="noopener">☕ 후원하기</a>
-    </span>
+    <a href="https://uriae.emilysoft.com" target="_blank" rel="noopener">uriae.emilysoft.com</a>
   </footer>
 
   <script src="vendor/jszip.min.js"></script>
