@@ -8,9 +8,18 @@ This product bundles the following third-party software:
    https://github.com/vladmandic/human
    License: MIT
 
-2. Face models (extension/vendor/models/blazeface.*, facemesh.*, faceres.*)
+2. Face detection models (extension/vendor/models/blazeface.*, facemesh.*)
    Distributed with @vladmandic/human. See the upstream repository for the
-   origin and license of each model before commercial use.
+   origin and license of each model.
+
+4. InsightFace face recognition model
+   (extension/vendor/models/insightface-mobilenet-swish.*)
+   TFJS conversion by Vladimir Mandic, https://github.com/vladmandic/insightface (MIT).
+   The pretrained weights come from the InsightFace project
+   (https://github.com/deepinsight/insightface), whose pretrained models are
+   available for NON-COMMERCIAL research purposes only.
+   This project uses it free of charge for non-commercial purposes.
+   Replace this model before any commercial use.
 
 3. JSZip (extension/vendor/jszip.min.js)
    https://github.com/Stuk/jszip

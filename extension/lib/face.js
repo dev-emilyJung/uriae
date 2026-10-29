@@ -1,9 +1,14 @@
-// 얼굴 검출·특징값 계산. @vladmandic/human 을 확장 안에 포함해 브라우저(WebGL)에서만 실행.
-// 사진과 얼굴 데이터는 외부로 전송되지 않는다.
+// 얼굴 찾기와 얼굴 특징값 계산. 모두 브라우저(WebGL) 안에서만 실행하고, 사진과 얼굴 정보는 밖으로 보내지 않는다.
 // 저장하는 것은 우리 아이 기준 얼굴뿐이고, 다른 아이 얼굴은 비교 후 버린다.
+//
+// 1) @vladmandic/human 으로 얼굴 위치와 윤곽점(468개)을 찾고
+// 2) 눈·코·입꼬리 5점을 ArcFace 표준 위치에 맞춰 112×112로 정렬한 뒤
+// 3) InsightFace(mobilenet-swish) 모델로 특징값을 계산한다.
+// 정렬 없이 넣으면 정확도가 크게 떨어진다(공개 얼굴 데이터 측정: 정렬 시 같은 사람과 다른 사람 점수가 겹치지 않음).
 import { Human } from '../vendor/human.esm.js';
 
-const MIN_FACE_PX = 36; // 이보다 작은 얼굴은 특징값이 너무 부정확해서 제외 (단체사진 속 얼굴은 40~80px 정도)
+export const MODEL_ID = 'insightface-swish-aligned-v1';
+const MIN_FACE_PX = 36; // 이보다 작은 얼굴은 특징값이 너무 부정확해서 제외
 
 const config = {
   modelBasePath: chrome.runtime.getURL('vendor/models/'),
@@ -17,7 +22,7 @@ const config = {
     detector: { rotation: true, maxDetected: 40, minConfidence: 0.4, return: false },
     mesh: { enabled: true },
     iris: { enabled: false },
-    description: { enabled: true },
+    description: { enabled: false },
     emotion: { enabled: false },
     antispoof: { enabled: false },
     liveness: { enabled: false },
@@ -30,11 +35,16 @@ const config = {
   segmentation: { enabled: false },
 };
 
+// ArcFace 표준 5점 (112×112): 왼눈, 오른눈, 코끝, 왼입꼬리, 오른입꼬리
+const TEMPLATE = [[38.2946, 51.6963], [73.5318, 51.5014], [56.0252, 71.7366], [41.5493, 92.3655], [70.7299, 92.2041]];
+
 let human;
+let embedder;
 export async function initFace() {
-  if (human) return human;
+  if (human && embedder) return human;
   human = new Human(config);
   await human.load();
+  embedder = await human.tf.loadGraphModel(chrome.runtime.getURL('vendor/models/insightface-mobilenet-swish.json'));
   return human;
 }
 
@@ -50,14 +60,14 @@ export async function loadCanvas(src, maxSide = 1280) {
   return c;
 }
 
-async function toDataURL(canvas, box, size = 112) {
+async function toDataURL(canvas, box, size = 160) {
   const [x, y, w, h] = box;
   const pad = Math.max(w, h) * 0.2;
   const sx = Math.max(0, x - pad), sy = Math.max(0, y - pad);
   const sw = Math.min(canvas.width - sx, w + pad * 2), sh = Math.min(canvas.height - sy, h + pad * 2);
   const t = new OffscreenCanvas(size, size);
   t.getContext('2d').drawImage(canvas, sx, sy, sw, sh, 0, 0, size, size);
-  const blob = await t.convertToBlob({ type: 'image/jpeg', quality: 0.85 });
+  const blob = await t.convertToBlob({ type: 'image/jpeg', quality: 0.9 });
   return new Promise((r) => {
     const fr = new FileReader();
     fr.onload = () => r(fr.result);
@@ -65,33 +75,42 @@ async function toDataURL(canvas, box, size = 112) {
   });
 }
 
-/**
- * 얼굴 아래 옷 부분의 색 분포 (색상 12 × 채도 3 × 밝기 3 = 108칸, 합이 1).
- * 같은 날 같은 옷을 입은 아이를 이어 주는 데 쓴다. 메모리에서만 쓰고 저장하지 않는다.
- */
-function clothHistogram(canvas, box) {
-  const [x, y, w, h] = box;
-  const cx = x + w / 2;
-  const left = Math.max(0, cx - w * 0.8), right = Math.min(canvas.width, cx + w * 0.8);
-  const top = Math.min(canvas.height, y + h * 1.15), bottom = Math.min(canvas.height, y + h * 2.6);
-  if (right - left < w * 0.6 || bottom - top < h * 0.5) return null; // 옷이 사진 밖으로 잘림
-  const N = 24;
-  const t = new OffscreenCanvas(N, N);
-  const ctx = t.getContext('2d', { willReadFrequently: true });
-  ctx.drawImage(canvas, left, top, right - left, bottom - top, 0, 0, N, N);
-  const px = ctx.getImageData(0, 0, N, N).data;
-  const hist = new Array(108).fill(0);
-  for (let i = 0; i < px.length; i += 4) {
-    const r = px[i] / 255, g = px[i + 1] / 255, b = px[i + 2] / 255;
-    const max = Math.max(r, g, b), min = Math.min(r, g, b), d = max - min;
-    let hue = 0;
-    if (d) hue = max === r ? ((g - b) / d + 6) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
-    const sat = max ? d / max : 0;
-    const hb = Math.min(11, Math.floor(hue * 2)), sb = Math.min(2, Math.floor(sat * 3)), vb = Math.min(2, Math.floor(max * 3));
-    hist[hb * 9 + sb * 3 + vb]++;
+const avg = (pts) => [pts.reduce((s, p) => s + p[0], 0) / pts.length, pts.reduce((s, p) => s + p[1], 0) / pts.length];
+
+/** 윤곽점(468개)에서 눈 중심 2개, 코끝, 입꼬리 2개 */
+function fivePoints(mesh) {
+  return [avg([mesh[33], mesh[133]]), avg([mesh[362], mesh[263]]), mesh[1], mesh[61], mesh[291]].map((p) => [p[0], p[1]]);
+}
+
+/** 5점 → 표준 위치로 가는 닮음변환(회전·크기·이동) 최소제곱 */
+function similarity(src, dst) {
+  const n = src.length;
+  const [sx, sy] = avg(src), [dx, dy] = avg(dst);
+  let a = 0, b = 0, d = 0;
+  for (let i = 0; i < n; i++) {
+    const px = src[i][0] - sx, py = src[i][1] - sy, qx = dst[i][0] - dx, qy = dst[i][1] - dy;
+    a += px * qx + py * qy;
+    b += px * qy - py * qx;
+    d += px * px + py * py;
   }
-  const n = N * N;
-  return hist.map((v) => v / n);
+  const c = a / d, s = b / d;
+  return { c, s, tx: dx - (c * sx - s * sy), ty: dy - (s * sx + c * sy) };
+}
+
+/** 정렬한 112×112 얼굴 → 특징값 */
+async function embed(canvas, mesh) {
+  const m = similarity(fivePoints(mesh), TEMPLATE);
+  const t = new OffscreenCanvas(112, 112);
+  const ctx = t.getContext('2d', { willReadFrequently: true });
+  ctx.setTransform(m.c, m.s, -m.s, m.c, m.tx, m.ty);
+  ctx.drawImage(canvas, 0, 0);
+  const pixels = ctx.getImageData(0, 0, 112, 112);
+  const tf = human.tf;
+  const input = tf.tidy(() => tf.expandDims(tf.div(tf.cast(tf.browser.fromPixels(pixels), 'float32'), 255), 0));
+  const out = embedder.execute(input);
+  const v = Array.from(await out.data());
+  tf.dispose([input, out]);
+  return v;
 }
 
 /**
@@ -100,18 +119,17 @@ function clothHistogram(canvas, box) {
  */
 export async function detectFaces(src, { withCrops = false } = {}) {
   const h = await initFace();
-  const canvas = await loadCanvas(src);
+  const canvas = src instanceof OffscreenCanvas ? src : await loadCanvas(src);
   const res = await h.detect(canvas);
   const faces = [];
   for (const f of res.face || []) {
-    if (!f.embedding || !f.embedding.length) continue;
+    if (!f.mesh || f.mesh.length < 300) continue;
     const size = Math.min(f.box[2], f.box[3]);
     if (size < MIN_FACE_PX) continue;
     faces.push({
       box: f.box,
       size,
-      emb: Array.from(f.embedding),
-      cloth: clothHistogram(canvas, f.box),
+      emb: await embed(canvas, f.mesh),
       crop: withCrops ? await toDataURL(canvas, f.box) : undefined,
     });
   }
@@ -124,5 +142,27 @@ export async function referenceFromFile(file, date) {
   if (!faces.length) return null;
   faces.sort((a, b) => b.size - a.size);
   const f = faces[0];
-  return { id: crypto.randomUUID(), emb: f.emb, thumb: f.crop, date };
+  return { id: crypto.randomUUID(), emb: f.emb, thumb: f.crop, date, model: MODEL_ID };
+}
+
+/**
+ * 예전 모델로 만든 기준 얼굴을 새 모델로 다시 계산. 저장해 둔 얼굴 썸네일에서 얼굴을 다시 찾는다.
+ * 실패하면 null (다시 골라야 함)
+ */
+export async function upgradeReference(ref) {
+  if (ref.model === MODEL_ID) return ref;
+  try {
+    const blob = await (await fetch(ref.thumb)).blob();
+    const bmp = await createImageBitmap(blob);
+    // 썸네일이 작아서 2배로 키운 뒤 얼굴을 찾는다
+    const c = new OffscreenCanvas(bmp.width * 2, bmp.height * 2);
+    c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height);
+    bmp.close();
+    const faces = await detectFaces(c);
+    if (!faces.length) return null;
+    faces.sort((a, b) => b.size - a.size);
+    return { ...ref, emb: faces[0].emb, model: MODEL_ID };
+  } catch {
+    return null;
+  }
 }

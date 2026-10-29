@@ -114,6 +114,8 @@ PR을 보내주시면 기여자 라이선스 동의(CLA)를 요청드립니다.
 
 개인 사용과 오픈소스 활용은 자유입니다. AGPL 조건 밖의 상업적 이용은 별도 라이선스를 문의해 주세요.
 
-포함된 서드파티: [@vladmandic/human](https://github.com/vladmandic/human) (MIT), [JSZip](https://github.com/Stuk/jszip) (MIT/GPLv3) — 자세한 내용은 [NOTICE](NOTICE)
+포함된 서드파티: [@vladmandic/human](https://github.com/vladmandic/human) (MIT), [JSZip](https://github.com/Stuk/jszip) (MIT/GPLv3), InsightFace 얼굴 인식 모델 — 자세한 내용은 [NOTICE](NOTICE)
+
+> ⚠️ 얼굴 인식에 쓰는 InsightFace 사전학습 모델은 **비상업 용도로만** 쓸 수 있습니다. 이 프로젝트는 무료 비상업 도구로 이 모델을 사용하며, 상업적으로 쓰려면 다른 모델로 바꿔야 합니다.
 
 **최초 공개: 2026-10-29**
