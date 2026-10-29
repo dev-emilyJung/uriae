@@ -297,9 +297,62 @@ async function showPhotos() {
   if (photoState && photoState.sig === selSig()) drawResults(results);
 }
 
+const summaryText = (groups) => groups.map((g) =>
+  `${givenName(g.name)}: 앨범 ${g.total.toLocaleString('ko-KR')}장 중 ${g.sure.length}장${g.maybe.length ? `, 확인 필요 ${g.maybe.length}장` : ''}, 알림장 ${g.reports.length}장${stopRequested ? ' (중지한 지점까지)' : ''}`).join(' · ');
+
+// 사용자가 결과를 고친 내용 (아이별, 이 탭이 열려 있는 동안만). pos: 우리 아이 맞음, neg: 우리 아이 아님
+const feedback = new Map();
+const fbOf = (child) => {
+  if (!feedback.has(child)) feedback.set(child, { pos: new Map(), neg: new Map() });
+  return feedback.get(child);
+};
+
+/** 한 아이의 앨범 사진을 판정. 얼굴 특징값은 faceMem(메모리)에서 가져온다 */
+function classifyKid(kid, mine, reports, strictness) {
+  const { refsFor, cohortStats, sampleCohort, decide, judge } = matchLib;
+  const th = decide(strictness);
+  const fb = fbOf(kid.child);
+  const allEmbs = mine.flatMap((j) => (faceMem.get(j.img.id) || []).map((f) => f.emb));
+  const cohort = sampleCohort(allEmbs, 300);
+  const extra = [...fb.pos.values()].map((p) => ({ emb: p.emb, date: p.date }));
+  const statCache = new Map();
+  const withStat = (r) => {
+    if (!statCache.has(r)) statCache.set(r, { emb: r.emb, stat: cohortStats(r.emb, cohort) });
+    return statCache.get(r);
+  };
+  const neg = [...fb.neg.values()].map((n) => n.emb);
+  for (const j of mine) {
+    const faces = faceMem.get(j.img.id) || [];
+    const refs = [...refsFor(j.date, kid.refs), ...extra].map(withStat);
+    let best = { level: 0, z: -9, raw: 0, idx: -1 };
+    faces.forEach((f, i) => {
+      if (!f.stat) f.stat = cohortStats(f.emb, cohort);
+      const r = judge(f.emb, f.stat, refs, neg, th);
+      if (r.level > best.level || (r.level === best.level && r.z > best.z)) best = { ...r, idx: i };
+    });
+    // 사용자가 직접 고친 사진은 그대로 따른다
+    const key = `${kid.child}:${j.img.id}`;
+    if (fb.pos.has(key)) best.level = 3;
+    if (fb.neg.has(key)) best.level = 0;
+    j.level = best.level;
+    j.score = best.z;
+    j.faceIdx = best.idx;
+  }
+  return {
+    child: kid.child,
+    name: kid.name,
+    reports: [...reports].sort((a, b) => b.date.localeCompare(a.date)),
+    sure: mine.filter((j) => j.level === 3).sort((a, b) => b.date.localeCompare(a.date)),
+    maybe: mine.filter((j) => j.level === 1).sort((a, b) => b.score - a.score).slice(0, 300),
+    total: mine.length,
+  };
+}
+let matchLib = null;
+
 async function runSearch(days, kids, ui) {
+  matchLib = await import('./lib/match.js');
   const { initFace, detectFaces } = await import('./lib/face.js');
-  const { refsFor, faceScore, decide } = await import('./lib/match.js');
+
   stopRequested = false;
   ui.runBtn.disabled = true;
   ui.stopBtn.hidden = false;
@@ -384,42 +437,18 @@ async function runSearch(days, kids, ui) {
       albumJobs.splice(0, albumJobs.length, ...albumJobs.filter((j) => faceMem.has(j.img.id)));
     }
 
-    // 3) 아이별 판정: 상위 점수 + 같은 날 사진 연결
+    // 3) 아이별 판정 (사용자가 고친 내용이 있으면 함께 반영)
     const strictness = await store.get(K.strictness, 0.5);
-    const groups = kids.map((kid) => {
-      const mine = albumJobs.filter((j) => j.kid === kid);
-      const faces = [];
-      for (const j of mine) {
-        const refs = refsFor(j.date, kid.refs);
-        faceMem.get(j.img.id).forEach((f, i) => faces.push({ key: `${j.img.id}:${i}`, job: j, date: j.date, emb: f.emb, size: f.size, score: faceScore(f.emb, refs) }));
-      }
-      const th = decide(strictness);
-      const sureKeys = new Set(faces.filter((f) => f.score >= th.sure).map((f) => f.key));
-      const best = new Map(); // 사진별 가장 우리 아이다운 얼굴
-      for (const f of faces) {
-        const level = sureKeys.has(f.key) ? 3 : f.score >= th.maybe ? 1 : 0;
-        const prev = best.get(f.job.img.id);
-        if (!prev || level > prev.level || (level === prev.level && f.score > prev.score)) best.set(f.job.img.id, { level, score: f.score });
-      }
-      for (const j of mine) {
-        const b = best.get(j.img.id) || { level: 0, score: 0 };
-        j.level = b.level;
-        j.score = b.score;
-      }
-      // 확실한 순서(점수 높은 순)로 보여줘서 어디서부터 틀리는지 바로 보이게 한다
-      const sure = mine.filter((j) => j.level === 3).sort((a, b) => b.date.localeCompare(a.date));
-      const maybe = mine.filter((j) => j.level === 1).sort((a, b) => b.score - a.score).slice(0, 300);
-      const reports = reportJobs.filter((j) => j.kid === kid).sort((a, b) => b.date.localeCompare(a.date));
-      return { child: kid.child, name: kid.name, reports, sure, maybe, total: mine.length };
-    });
+    const groups = kids.map((kid) => classifyKid(kid, albumJobs.filter((j) => j.kid === kid), reportJobs.filter((j) => j.kid === kid), strictness));
     photoState = {
       sig: selSig(),
+      kids,
+      jobs: { albumJobs, reportJobs },
       groups,
       selected: new Set(groups.flatMap((g) => [...g.reports, ...g.sure].map((j) => `${g.child}:${j.img.id}`))),
     };
     drawResults(ui.results);
-    ui.status.textContent = groups.map((g) =>
-      `${givenName(g.name)}: 앨범 ${g.total.toLocaleString('ko-KR')}장 중 ${g.sure.length}장${g.maybe.length ? `, 확인 필요 ${g.maybe.length}장` : ''}, 알림장 ${g.reports.length}장${stopRequested ? ' (중지한 지점까지)' : ''}`).join(' · ');
+    ui.status.textContent = summaryText(groups);
   } catch (e) {
     if (e instanceof NotLoggedInError) return showLogin();
     ui.status.textContent = '오류: ' + (e.message || e);
@@ -446,12 +475,39 @@ function drawResults(container) {
       h('span', { class: 'check' }, '✓'),
     );
     el.onclick = () => {
-      if (s.selected.has(key)) s.selected.delete(key);
-      else s.selected.add(key);
+      const fb = fbOf(g.child);
+      const face = (faceMem.get(x.img.id) || [])[x.faceIdx];
+      if (s.selected.has(key)) {
+        s.selected.delete(key);
+        // 우리 아이로 뽑혔던 사진을 빼면 "이 얼굴은 다른 아이"로 기억
+        if (kind === 'sure' && face) fb.neg.set(key, { emb: face.emb });
+        fb.pos.delete(key);
+      } else {
+        s.selected.add(key);
+        // 확인 필요에서 고르면 "이 얼굴은 우리 아이"로 기억
+        if (kind === 'maybe' && face) fb.pos.set(key, { emb: face.emb, date: x.date });
+        fb.neg.delete(key);
+      }
       el.classList.toggle('sel');
       updateCount();
+      updateRefine();
     };
     return el;
+  };
+  const refineBtn = h('button', { class: 'btn ghost', hidden: true }, '');
+  const updateRefine = () => {
+    const n = s.groups.reduce((sum, g) => sum + fbOf(g.child).pos.size + fbOf(g.child).neg.size, 0);
+    refineBtn.hidden = !n;
+    refineBtn.textContent = `고친 ${n}장을 반영해서 다시 찾기`;
+  };
+  refineBtn.onclick = async () => {
+    const strictness = await store.get(K.strictness, 0.5);
+    s.groups = s.kids.map((kid) => classifyKid(kid, s.jobs.albumJobs.filter((j) => j.kid === kid), s.jobs.reportJobs.filter((j) => j.kid === kid), strictness));
+    // 선택 상태도 새 판정에 맞춘다 (직접 고친 것은 유지)
+    s.selected = new Set(s.groups.flatMap((g) => [...g.reports, ...g.sure].map((j) => `${g.child}:${j.img.id}`)));
+    drawResults(container);
+    const st = main.querySelector('.toolbar + .muted');
+    if (st) st.textContent = summaryText(s.groups);
   };
 
   const multi = s.groups.length > 1;
@@ -463,9 +519,9 @@ function drawResults(container) {
       nodes.push(h('div', { class: 'section-label' }, `${who}${title}`, h('small', {}, `${list.length}장 · ${note}`)));
       nodes.push(h('div', { class: 'grid' }, list.map((x) => tile(g, x, kind))));
     };
-    block('우리 아이', '자동 선택', g.sure, 'sure');
+    block('우리 아이', '아닌 사진은 눌러서 빼 주세요', g.sure, 'sure');
     block('알림장 사진', '선생님이 우리 아이에게 보낸 사진', g.reports, 'report');
-    block('확인이 필요해요', '우리 아이가 맞으면 눌러서 선택', g.maybe, 'maybe');
+    block('확인이 필요해요', '우리 아이가 맞으면 눌러서 골라 주세요', g.maybe, 'maybe');
     if (multi && !g.sure.length && !g.maybe.length && !g.reports.length) {
       nodes.push(h('div', { class: 'section-label' }, givenName(g.name), h('small', {}, '찾은 사진이 없어요')));
     }
@@ -476,9 +532,10 @@ function drawResults(container) {
       .map(({ g, x }) => ({ ...x, folder: multi ? givenName(g.name) : '' }));
     downloadZip(picked, dlBtn);
   };
-  nodes.push(all.length ? h('div', { class: 'dock' }, countEl, dlBtn) : stateView('찾은 사진이 없어요', '기준 얼굴을 기간별로 더 추가하거나 기간을 늘려보세요.'));
+  nodes.push(all.length ? h('div', { class: 'dock' }, countEl, h('div', { class: 'dock-actions' }, refineBtn, dlBtn)) : stateView('찾은 사진이 없어요', '기준 얼굴을 기간별로 더 추가하거나 기간을 늘려보세요.'));
   container.replaceChildren(...nodes);
   updateCount();
+  updateRefine();
 }
 
 async function downloadZip(list, btn) {

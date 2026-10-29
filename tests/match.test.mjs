@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { cosine, refsFor, faceScore, decide, agePeriods } from '../extension/lib/match.js';
+import { cosine, refsFor, faceScore, decide, judge, cohortStats, agePeriods } from '../extension/lib/match.js';
 
 test('cosine', () => {
   assert.equal(Math.round(cosine([1, 0], [1, 0]) * 100), 100);
@@ -18,11 +18,20 @@ test('사진 날짜와 가까운 기준 얼굴을 고른다', () => {
   assert.equal(refsFor('2025-06-01', refs).length, 4);
 });
 
-test('기준선: 기본 0.40, 확인 필요는 0.08 아래까지', () => {
+test('판정: 보정 점수 기준선과 "아니에요" 반영', () => {
   const th = decide(0.5);
-  assert.equal(th.sure.toFixed(2), '0.40');
-  assert.equal(th.maybe.toFixed(2), '0.32');
-  assert.ok(decide(1).sure > decide(0).sure);
+  assert.equal(th.sure, 2);
+  assert.ok(Math.abs(th.maybe - 1.4) < 1e-9);
+  // 무리(다른 아이들)는 [0,1] 근처, 우리 아이 기준 얼굴은 [1,0]
+  const cohort = Array.from({ length: 50 }, (_, i) => [0.1 * Math.sin(i), 1]);
+  const ref = { emb: [1, 0] };
+  ref.stat = cohortStats(ref.emb, cohort);
+  const ours = [0.95, 0.1];
+  const r1 = judge(ours, cohortStats(ours, cohort), [ref], [], th);
+  assert.equal(r1.level, 3);
+  // 같은 얼굴을 "아니에요"로 표시하면 제외
+  const r2 = judge(ours, cohortStats(ours, cohort), [ref], [[0.95, 0.1]], th);
+  assert.equal(r2.level, 0);
 });
 
 test('faceScore는 가장 닮은 기준 얼굴 점수', () => {
