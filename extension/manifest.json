@@ -3,8 +3,8 @@
   "name": "우리애 한눈에",
   "short_name": "우리애 한눈에",
   "version": "0.1.0",
-  "description": "준비물·일정은 한눈에, 우리 아이 사진만 골라서 한 번에. 키즈노트 웹과 함께 쓰는 비공식 도구. 모든 처리는 내 컴퓨터 안에서만.",
-  "homepage_url": "https://kids.emilysoft.com",
+  "description": "준비물은 한눈에, 우리 아이 사진만 골라서 한 번에. 아이 사진·정보는 어디로도 보내지 않아요. 키즈노트 웹과 함께 쓰는 비공식 도구.",
+  "homepage_url": "https://uriae.emilysoft.com",
   "icons": {
     "16": "icons/icon16.png",
     "48": "icons/icon48.png",

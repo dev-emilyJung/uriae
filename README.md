@@ -10,13 +10,14 @@
 </p>
 
 <p align="center">
-  <a href="https://kids.emilysoft.com">kids.emilysoft.com</a> ·
+  <a href="https://uriae.emilysoft.com">uriae.emilysoft.com</a> ·
   <a href="#후원">☕ 후원하기</a> ·
   <a href="#설치">설치</a>
 </p>
 
-> 🔒 **사진과 얼굴 데이터는 당신 컴퓨터 밖으로 나가지 않습니다.**
-> 서버가 없고, 계정 정보를 받지도 저장하지도 않습니다.
+> 🔒 **우리 아이 사진과 정보는 어디로도 보내지 않습니다.**
+> 서버 없음 · 회원가입 없음 · 비밀번호 안 받음. 개발자인 저도 여러분의 사진을 볼 수 없습니다.
+> 모든 작업은 여러분의 컴퓨터 안에서만 끝나고, 코드는 전부 공개되어 있어 누구나 확인할 수 있습니다.
 
 > ⚠️ 키즈노트(주)와 관련 없는 **비공식** 개인 도구입니다.
 
@@ -99,7 +100,7 @@ PR을 보내주시면 기여자 라이선스 동의(CLA)를 요청드립니다.
 
 이 도구는 **모든 기능이 무료**입니다. 도움이 되셨다면 커피 한 잔으로 응원해 주세요. ☕
 
-- 후원 안내: https://kids.emilysoft.com/#support
+- 후원 안내: https://uriae.emilysoft.com/#support
 
 ## 고지
 
@@ -109,7 +110,7 @@ PR을 보내주시면 기여자 라이선스 동의(CLA)를 요청드립니다.
 
 ## 라이선스
 
-[AGPL-3.0](LICENSE) © 2026 EmilySoft ([kids.emilysoft.com](https://kids.emilysoft.com))
+[AGPL-3.0](LICENSE) © 2026 EmilySoft ([uriae.emilysoft.com](https://uriae.emilysoft.com))
 
 개인 사용과 오픈소스 활용은 자유입니다. AGPL 조건 밖의 상업적 이용은 별도 라이선스를 문의해 주세요.
 
