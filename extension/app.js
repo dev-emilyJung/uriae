@@ -604,7 +604,12 @@ async function showPicker(kid, p) {
   const saveBtn = h('button', { class: 'btn', disabled: true }, '선택한 얼굴 등록');
   const back = h('button', { class: 'btn ghost small', onclick: () => showFaces() }, '← 돌아가기');
   render(back, h('h2', { style: 'margin:14px 0 4px' }, `${kid.name} · ${p.label}`),
-    h('p', { class: 'muted' }, `${p.start.replaceAll('-', '.')} ~ ${p.end.replaceAll('-', '.')} 사진 속 얼굴이에요. 우리 아이 얼굴을 2개 이상 눌러 주세요. 정면에 가깝고 선명한 얼굴이 좋아요.`),
+    h('p', { class: 'muted' }, `${p.start.replaceAll('-', '.')} ~ ${p.end.replaceAll('-', '.')} 사진 속 얼굴이에요. 우리 아이 얼굴을 2개 이상 눌러 주세요.`),
+    h('ul', { class: 'guide' },
+      h('li', {}, h('b', {}, '가운데 얼굴만 봐요. '), '칸마다 가운데 얼굴 하나만 기준이 돼요. 친구들과 같이 찍은 사진이라도 가운데가 우리 아이면 골라도 돼요.'),
+      h('li', {}, h('b', {}, '골고루 섞어 주세요. '), '정면 독사진에 단체사진 속 얼굴, 살짝 옆모습을 1~2개 섞으면 단체사진에서도 더 잘 찾아요.'),
+      h('li', {}, h('b', {}, '이런 얼굴은 빼 주세요. '), '가장자리에 잘린 얼굴, 다른 아이와 겹친 얼굴, 손이나 물건에 많이 가려진 얼굴, 완전히 옆으로 돌린 얼굴.'),
+    ),
     status, grid, h('div', { class: 'dock' }, h('span', {}, '우리 아이 얼굴만 골라 주세요'), saveBtn));
   saveBtn.onclick = async () => {
     await saveRefs(kid.child, [...picked.values()]);
