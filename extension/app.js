@@ -188,6 +188,9 @@ async function showPrep() {
 
   const loadedAt = new Date();
   const checked = await store.get(K.checked, {});
+  const hidden = await store.get(K.hidden, {}); // 읽고 필요 없다고 숨긴 카드
+  const old = cutoffYMD(60);
+  for (const [k, d] of Object.entries(hidden)) if (d < old) delete hidden[k];
   const ocr = await store.get(K.ocr, {}); // 그림 key → {at: 글 날짜, doc: 안내문이면 1, text: 읽은 글자}
   const status = h('span', { class: 'ocr-status' });
   const t = today();
@@ -203,7 +206,15 @@ async function showPrep() {
         .filter((text) => isReadable(text) && !isReferenceDoc(text))
         .join('\n');
     }
-    const cards = buildCards([...posts.values()]);
+    const all = buildCards([...posts.values()]);
+    const cards = all.filter((c) => !hidden[c.key]);
+    const hiddenCards = all.filter((c) => hidden[c.key]);
+    const setHidden = (c, on) => {
+      if (on) hidden[c.key] = c.date;
+      else delete hidden[c.key];
+      store.set(K.hidden, hidden);
+      draw();
+    };
     const upcoming = cards.filter((c) => c.date >= t);
     const past = cards.filter((c) => c.date < t && daysBetween(c.date, t) <= 7).reverse();
     // 챙길 것을 못 찾은 그림 안내문 카드는 "확인했어요" 하나로 체크
@@ -231,6 +242,9 @@ async function showPrep() {
           multi ? c.who.map((w) => h('span', { class: 'who' }, w)) : null,
           h('span', { class: 'badge' }, c.source === 'notice' ? '공지' : '알림장'),
           c.images.length ? h('span', { class: 'badge' }, '그림 안내문') : null,
+          hidden[c.key]
+            ? h('button', { class: 'linkbtn hide-btn', onclick: () => setHidden(c, false) }, '다시 보기')
+            : h('button', { class: 'linkbtn hide-btn', title: '필요 없는 안내는 목록에서 숨겨요', onclick: () => setHidden(c, true) }, '숨기기'),
         ),
         c.title ? h('h3', {}, c.title) : null,
         c.events.length && !c.events[0].includes(c.title.replace('…', '')) ? h('div', { class: 'event' }, c.events[0]) : null,
@@ -286,6 +300,9 @@ async function showPrep() {
     }
     if (past.length) {
       out.push(h('details', { class: 'past' }, h('summary', {}, `지난 7일 안내 ${past.length}건`), past.map((c) => cardView(c))));
+    }
+    if (hiddenCards.length) {
+      out.push(h('details', { class: 'past' }, h('summary', {}, `숨긴 안내 ${hiddenCards.length}건`), hiddenCards.map((c) => cardView(c))));
     }
     if (!cards.length) out.push(stateView('최근 30일 안에 챙길 것을 찾지 못했어요', '규칙으로 찾기 때문에 놓친 게 있을 수 있어요. 키즈노트 원문도 한 번 확인해 주세요.'));
     out.push(h('p', { class: 'muted', style: 'margin-top:18px' }, '※ 문장 규칙으로 자동 추출한 결과예요. 그림으로 온 안내문도 글자를 읽어 살피지만, 중요한 안내는 원문을 꼭 확인해 주세요.'));

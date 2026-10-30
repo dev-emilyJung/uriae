@@ -130,6 +130,7 @@ summary { color: var(--soft); font-size: 13px; cursor: pointer; width: fit-conte
 .tile .check:hover { box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.5); }
 .tile:hover img { opacity: 1; }
 .linkbtn { float: right; border: 0; background: none; padding: 0; color: var(--pen); font-size: 13px; font-weight: 600; }
+.card-head .hide-btn { float: none; margin-left: auto; color: var(--soft); font-weight: 400; }
 .linkbtn:hover { text-decoration: underline; text-underline-offset: 3px; }
 
 /* ── 크게 보기 ── */
