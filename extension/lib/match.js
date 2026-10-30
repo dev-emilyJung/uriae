@@ -158,6 +158,7 @@ export function classifyPhotos(photos, refs, { pos = [], neg = [], forced = new 
       const rs = refsFor(p.date, [...refs, ...extra]).map(withStat);
       let best = { level: 0, z: -9, raw: 0, faceIdx: -1 };
       const sib = legacy ? [] : refsFor(p.date, others);
+      const cands = []; // 우리 아이일 수 있는 얼굴들 (이웃 비교에서 다시 고른다)
       p.faces.forEach((f, i) => {
         const r = judge(f.emb, statOf(f), rs, neg, th);
         if (r.level === 3 && (f.size < SURE_MIN_PX || (f.score ?? 1) < SURE_MIN_SCORE)) r.level = 1;
@@ -167,9 +168,11 @@ export function classifyPhotos(photos, refs, { pos = [], neg = [], forced = new 
           if (s >= r.raw) r.level = 0;
           else if (s >= r.raw - SIBLING_MARGIN && r.level === 3) r.level = 1;
         }
+        if (r.level) cands.push({ ...r, faceIdx: i });
         if (r.level > best.level || (r.level === best.level && r.z > best.z)) best = { ...r, faceIdx: i };
       });
       if (forced.has(p.id)) best.level = forced.get(p.id);
+      best.cands = cands;
       out.set(p.id, best);
     }
   };
@@ -197,9 +200,10 @@ export function classifyPhotos(photos, refs, { pos = [], neg = [], forced = new 
 
 /**
  * 이웃 비교 설정. n: 평균 낼 가장 닮은 얼굴 수, demote/promote: 비율 기준
+ * (모의 앨범으로 고름: 0.92 에서 잘못 찾음 6~9%, 바로 찾음 86%. 0.94 부터는 우리 아이도 확인 필요로 많이 내려간다)
  * 비율 = (기준 얼굴 중 가장 닮은 n개와의 유사도 평균) ÷ (앨범 속 다른 사진 얼굴 중 가장 닮은 n개와의 유사도 평균)
  */
-export const NEAR = { n: 3, demote: 0.9, promote: 0.97 };
+export const NEAR = { n: 3, demote: 0.92, promote: 0.97 };
 
 /**
  * 이웃 비교: "이 얼굴은 자기와 가장 닮은 앨범 속 얼굴들만큼 우리 아이 기준 얼굴과도 닮았나?"
@@ -229,19 +233,30 @@ export function checkNeighbors(photos, out, forced, th, scoreOf, refsOf) {
   // 비교 무리: 우리 아이와 어느 정도 닮은 얼굴(확인 필요 하한 이상)만. 다른 아이 얼굴은 비교에 쓸 일이 없고 계산만 늘린다
   const pool = [];
   for (const p of photos) for (const f of p.faces) if (scoreOf(p, f).raw >= th.rawMaybe) pool.push({ p, f, u: unit(f.emb) });
-  for (const p of photos) {
-    const r = out.get(p.id);
-    if (!r.level || forced.has(p.id) || r.faceIdx < 0) continue;
-    const f = p.faces[r.faceIdx];
+  const ratioOf = (p, f) => {
     const u = unit(f.emb);
-    // 앨범 속 다른 사진의 얼굴 (자기 자신·같은 사진·자동 기준 얼굴로 쓰인 같은 얼굴은 뺀다)
+    // 앨범 속 다른 사진의 얼굴 (같은 사진·자동 기준 얼굴로 쓰인 같은 얼굴은 뺀다)
     const album = pool.filter((o) => o.p !== p).map((o) => dot(u, o.u));
     const refs = refsOf(p).filter((x) => x.emb !== f.emb).map((x) => dot(u, unit(x.emb)));
-    if (album.length < NEAR.n || !refs.length) continue;
-    const ratio = topMean(refs) / Math.max(topMean(album), 1e-6);
-    r.near = ratio;
-    if (r.level === 3 && ratio < NEAR.demote) r.level = 1;
-    else if (r.level === 1 && ratio >= NEAR.promote && r.raw >= th.rawSure && f.size >= SURE_MIN_PX && (f.score ?? 1) >= SURE_MIN_SCORE) r.level = 3;
+    if (album.length < NEAR.n || !refs.length) return null;
+    return topMean(refs) / Math.max(topMean(album), 1e-6);
+  };
+  for (const p of photos) {
+    const r = out.get(p.id);
+    if (forced.has(p.id) || !r.cands?.length) continue;
+    // 한 사진의 후보 얼굴을 모두 비교한다: 가장 점수 높은 얼굴이 닮은 친구여도 같은 사진의 우리 아이를 놓치지 않게
+    let best = null;
+    for (const c of r.cands) {
+      const f = p.faces[c.faceIdx];
+      const ratio = ratioOf(p, f);
+      let level = c.level;
+      if (ratio != null) {
+        if (level === 3 && ratio < NEAR.demote) level = 1;
+        else if (level === 1 && ratio >= NEAR.promote && c.raw >= th.rawSure && f.size >= SURE_MIN_PX && (f.score ?? 1) >= SURE_MIN_SCORE) level = 3;
+      }
+      if (!best || level > best.level || (level === best.level && c.z > best.z)) best = { ...c, level, near: ratio };
+    }
+    Object.assign(r, best);
   }
 }
 
