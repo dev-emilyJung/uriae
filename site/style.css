@@ -41,6 +41,12 @@ a:focus-visible, .btn:focus-visible { outline: 2px solid var(--pen); outline-off
   font: 700 clamp(34px, 5.4vw, 54px)/1.28 var(--serif); letter-spacing: -0.01em; margin: 0 0 20px; max-width: 13em;
 }
 .hero .lead { font-size: 19px; color: var(--soft); margin: 0 0 32px; max-width: 30em; }
+[hidden] { display: none !important; }
+/* 휴대폰으로 열었을 때 안내 (PC에서 쓰는 확장 프로그램) */
+.mobile-note { margin: 0 0 24px; padding: 16px 18px; border: 2px solid var(--pen); border-radius: 8px; }
+.mobile-note b { font-size: 17px; }
+.mobile-note p { margin: 6px 0 12px; color: var(--soft); }
+.mobile-note .sub { display: block; margin-top: 8px; color: var(--soft); font-size: 14px; }
 .actions { display: flex; gap: 20px; align-items: center; flex-wrap: wrap; }
 .btn {
   display: inline-block; background: var(--pen); color: #fff; text-decoration: none; font-weight: 600;

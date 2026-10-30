@@ -8,7 +8,7 @@
   <meta property="og:type" content="website" />
   <meta property="og:site_name" content="우리애 한눈에" />
   <meta property="og:title" content="우리애 한눈에 — 키즈노트에서 우리 아이 사진만 골라 받기" />
-  <meta property="og:description" content="키즈노트 알림, 우리 아이 것만 남깁니다. 준비물 정리와 우리 아이 사진 모아받기. 무료, 사진은 어디로도 보내지 않아요." />
+  <meta property="og:description" content="PC 크롬용 무료 확장 프로그램. 키즈노트 준비물 정리와 우리 아이 사진 모아받기. 사진은 어디로도 보내지 않아요." />
   <!-- 공유 미리보기 그림: store/shots.html#og 에서 만든다 (node store/render.mjs). 바꾸면 v 값도 바꾼다 -->
   <meta property="og:image" content="https://uriae.emilysoft.com/og.png?v=20261030" />
   <meta property="og:image:width" content="1200" />
@@ -20,7 +20,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&family=IBM+Plex+Sans+KR:wght@400;600&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="style.css?v=20261030" /><!-- style.css 를 고치면 v 값을 바꿔서 브라우저가 새로 받게 한다 -->
+  <link rel="stylesheet" href="style.css?v=20261031" /><!-- style.css 를 고치면 v 값을 바꿔서 브라우저가 새로 받게 한다 -->
 </head>
 <body>
   <div class="wrap">
@@ -37,9 +37,16 @@
     <div class="hero">
       <h1>키즈노트 알림,<br />우리 아이 것만 남깁니다</h1>
       <p class="lead">긴 알림장에서 준비물만 뽑아 체크리스트로 만들고, 수천 장 앨범에서 우리 아이가 나온 사진만 골라 한 번에 받습니다.</p>
+      <!-- 휴대폰으로 열면(카톡 공유 등) PC에서 쓰는 도구라는 것과 주소 복사를 먼저 보여준다 -->
+      <div class="mobile-note" id="mobileNote" hidden>
+        <b>📱 휴대폰에서는 설치할 수 없어요</b>
+        <p>PC의 크롬·엣지·웨일에서 쓰는 확장 프로그램이에요. 이 주소를 PC에서 열어 설치해 주세요.</p>
+        <button class="btn" id="copyUrl" type="button">주소 복사</button>
+        <span class="sub" id="copyMsg" role="status"></span>
+      </div>
       <div class="actions">
         <a class="btn" href="https://chromewebstore.google.com/detail/pbadjleoagbglgabmmclkmplifcmlfen">Chrome에 추가</a>
-        <span class="sub">무료, PC의 크롬·엣지·웨일에서 사용</span>
+        <span class="sub">무료, <b>PC</b>의 크롬·엣지·웨일에서 사용</span>
       </div>
 
       <div class="demo" aria-label="알림장이 체크리스트로 바뀌는 예시">
@@ -74,14 +81,12 @@
     </div>
 
     <section class="part col" id="what">
-      <h2>하는 일은 세 가지입니다</h2>
+      <h2>하는 일은 두 가지입니다</h2>
       <dl class="what">
         <dt>챙길 것</dt>
-        <dd>알림장과 공지에서 준비물, 복장, 신청서 마감을 뽑아 오늘·내일·이번 주로 나눠 보여줍니다. 목록과 달력 중 편한 쪽으로 보고, 우리 아이와 상관없는 안내는 "해당 없음"으로 지워서 필요한 것만 남길 수 있습니다. 그림으로 올라온 가정통신문도 글자를 읽어 함께 정리하고, 원문과 안내문 그림도 바로 옆에서 확인할 수 있습니다.</dd>
+        <dd>알림장과 공지에서 준비물, 복장, 교재·숙제 보내기, 신청서 회신, 납부 마감을 뽑아 오늘·내일·이번 주로 나눠 보여줍니다. 소풍 준비물은 소풍 날, 동의서는 마감일처럼 할 일마다 날짜를 나눕니다. 목록과 달력 중 편한 쪽으로 보고, 우리 아이와 상관없는 안내는 "해당 없음"으로 지워서 필요한 것만 남길 수 있습니다. 그림으로 올라온 가정통신문도 글자를 읽어 함께 정리합니다.</dd>
         <dt>우리 아이 사진</dt>
-        <dd>앨범과 알림장 사진을 살펴 우리 아이가 나온 사진만 고릅니다. 단체사진도 포함됩니다. 사진을 크게 보면 어느 얼굴을 우리 아이로 봤는지 표시되고, 하나씩 누를 필요 없이 ZIP 파일 하나로 받습니다.</dd>
-        <dt>기준 얼굴</dt>
-        <dd>아이 얼굴은 금방 바뀌기 때문에 6개월 단위로 다섯 장 정도 등록합니다. 그 시기 알림장 사진 속 얼굴을 눌러서 고르면 됩니다. 처음엔 최근 시기만 고르면 바로 시작할 수 있고, 예전 사진을 찾을 때 그 시기 얼굴이 부족하면 알려 드립니다.</dd>
+        <dd>처음에 최근 사진 속 우리 아이 얼굴을 다섯 장 정도 골라 두면, 앨범과 알림장 사진에서 우리 아이가 나온 사진만 골라 ZIP 파일 하나로 받습니다. 단체사진도 포함됩니다. 닮은 친구나 형제자매와 헷갈리지 않도록 반 앨범 전체에서 같은 아이의 여러 사진을 함께 비교하고, 선생님이 보낸 알림장 독사진도 기준으로 씁니다. 애매한 사진은 크게 보며 Y/N으로 빠르게 고를 수 있습니다.</dd>
       </dl>
     </section>
 
@@ -91,8 +96,8 @@
         <li>위의 <b>Chrome에 추가</b> 버튼으로 설치합니다.</li>
         <li>PC에서 <a href="https://www.kidsnote.com">키즈노트 웹</a>에 평소처럼 로그인합니다.</li>
         <li>브라우저 오른쪽 위의 우리애 한눈에 아이콘을 누릅니다.</li>
-        <li>기준 얼굴에서 최근 시기 아이 얼굴을 다섯 장 정도 고릅니다.</li>
-        <li>챙길 것에서 준비물을 확인하고, 우리 아이 사진에서 사진을 받습니다.</li>
+        <li>챙길 것에서 준비물과 마감을 확인합니다.</li>
+        <li>우리 애 사진에서 처음 한 번 아이 얼굴을 다섯 장 정도 고른 뒤, 사진을 찾아 받습니다.</li>
       </ol>
       <p style="color:var(--soft);font-size:15px">아이가 둘 이상이거나 정규반과 방과후반에 함께 다녀도, 아이별·반별로 나눠 볼 수 있습니다.</p>
     </section>
@@ -125,7 +130,7 @@
       </details>
       <details>
         <summary>사진이 잘못 골라지면요?</summary>
-        <p>애매한 사진은 "확인이 필요해요"에 따로 모아 보여줍니다. 사진을 크게 보면서 Y(맞아요)·N(아니에요)로 고르고 "다시 찾기"를 누르면, 고친 내용을 배워서 다시 골라 줍니다. 그래도 다른 아이가 많이 섞이면 기준 얼굴 화면에서 찾는 기준을 "정확하게" 쪽으로 옮겨 보세요.</p>
+        <p>애매한 사진은 "확인이 필요해요"에 따로 모아 보여줍니다. 사진을 크게 보면서 Y(맞아요)·N(아니에요)로 고르고 "다시 찾기"를 누르면, 고친 내용을 배워서 다시 골라 줍니다. 그래도 다른 아이가 많이 섞이면 우리 애 사진의 "기준 얼굴 관리"에서 찾는 기준을 "정확하게" 쪽으로 옮겨 보세요.</p>
       </details>
       <details>
         <summary>정말 무료인가요?</summary>
@@ -170,6 +175,24 @@
       <p class="dev">개발자라면 <a href="https://github.com/dev-emilyJung/uriae">GitHub에서 별</a>을 눌러 주셔도 큰 힘이 됩니다.</p>
     </section>
     <script>
+      // 휴대폰으로 열었을 때: PC에서 쓰는 도구 안내 + 주소 복사
+      (() => {
+        if (!/Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent)) return;
+        const note = document.getElementById('mobileNote');
+        const msg = document.getElementById('copyMsg');
+        note.hidden = false;
+        document.querySelector('.hero .actions').hidden = true; // 휴대폰에서는 설치 버튼이 동작하지 않는다
+        document.getElementById('copyUrl').addEventListener('click', async () => {
+          const url = 'https://uriae.emilysoft.com';
+          try {
+            await navigator.clipboard.writeText(url);
+            msg.textContent = '복사했어요. PC로 보내서 열어 주세요.';
+          } catch {
+            msg.textContent = url;
+          }
+        });
+      })();
+
       // 의견 보내기
       (() => {
         const form = document.getElementById('fb');
