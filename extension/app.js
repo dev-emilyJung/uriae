@@ -505,7 +505,7 @@ function drawResults(container) {
     if (yes) {
       s.selected.add(key);
       fb.neg.delete(key);
-      if (seen && face && (kind === 'maybe' || idx !== x.faceIdx)) {
+      if (seen && face) {
         s.manual?.delete(key);
         fb.pos.set(key, { emb: face.emb, date: x.date });
         // 잘못 짚었던 얼굴은 "다른 아이"로 기억
