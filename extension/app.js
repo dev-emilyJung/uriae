@@ -1084,7 +1084,7 @@ async function showFaces(flash = '') {
         : `아이 얼굴은 금방 바뀌어서, 시기마다 ${REF_GOAL}개 정도 있으면 가장 정확해요. 사진을 찾을 때는 그 사진 날짜와 가까운 시기의 얼굴로 비교해요.`),
       h('div', { class: 'periods' }, shown.map(periodRow)),
       folded.length ? h('details', { class: 'past' },
-        h('summary', {}, `예전 시기 ${folded.length}개 (예전 사진까지 찾을 때 골라 주세요)`),
+        h('summary', {}, `예전 시기 ${folded.length}개 · 옛날 사진도 찾으려면 그때 얼굴을 골라 주세요`),
         h('div', { class: 'periods' }, folded.map(periodRow))) : null,
       undated.length ? h('div', {}, h('div', { class: 'section-label' }, '날짜 없는 기준 얼굴', h('small', {}, '예전 버전에서 등록한 얼굴')), h('div', { class: 'refs' }, undated.map(refChip))) : null,
       h('div', { class: 'toolbar', style: 'margin-top:12px' },
