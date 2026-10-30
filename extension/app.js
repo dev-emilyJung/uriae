@@ -443,7 +443,7 @@ async function runSearch(days, kids, ui) {
       pending.delete(i);
       let faces = [];
       if (blob) {
-        try { faces = (await detectFaces(blob)).map((f) => ({ emb: f.emb, size: f.size })); } catch { faces = []; }
+        try { faces = (await detectFaces(blob)).map((f) => ({ emb: f.emb, size: f.size, box: f.nbox })); } catch { faces = []; }
       }
       faceMem.set(todo[i].img.id, faces);
       done++;
@@ -484,36 +484,160 @@ function drawResults(container) {
     countEl.textContent = `선택 ${s.selected.size}장`;
     dlBtn.disabled = !s.selected.size;
   };
-  const tile = (g, x, kind) => {
+  const tiles = new Map(); // 사진 key → 목록의 칸
+
+  /**
+   * 사진 하나를 "우리 아이 맞음/아님"으로 표시하고, 고친 내용을 다음 판정용으로 기억한다.
+   * idx: 우리 아이 얼굴 번호. 크게 보기에서 다른 얼굴을 누르면 그 얼굴로 바뀐다.
+   */
+  const mark = (g, x, kind, yes, idx = x.faceIdx) => {
     const key = `${g.child}:${x.img.id}`;
-    const el = h('button', { class: 'tile' + (kind === 'maybe' ? ' maybe' : '') + (s.selected.has(key) ? ' sel' : ''), title: `${x.date} ${x.title}` },
+    const fb = fbOf(g.child);
+    const faces = faceMem.get(x.img.id) || [];
+    const face = faces[idx];
+    if (yes) {
+      s.selected.add(key);
+      fb.neg.delete(key);
+      // 확인 필요에서 고르거나 얼굴을 직접 고르면 "이 얼굴은 우리 아이"로 기억
+      if (face && (kind === 'maybe' || idx !== x.faceIdx)) fb.pos.set(key, { emb: face.emb, date: x.date });
+      // 잘못 짚었던 얼굴은 "다른 아이"로 기억
+      if (idx !== x.faceIdx && faces[x.faceIdx]) fb.neg.set(`${key}#${x.faceIdx}`, { emb: faces[x.faceIdx].emb });
+      x.faceIdx = idx;
+    } else {
+      s.selected.delete(key);
+      fb.pos.delete(key);
+      // 아니라고 한 사진의 얼굴은 "다른 아이"로 기억
+      if (face) fb.neg.set(key, { emb: face.emb });
+    }
+    tiles.get(key)?.classList.toggle('sel', yes);
+    updateCount();
+    updateRefine();
+  };
+
+  const tile = (items, i) => {
+    const { g, x, kind } = items[i];
+    const key = `${g.child}:${x.img.id}`;
+    const check = h('span', { class: 'check', title: s.selected.has(key) ? '빼기' : '고르기' }, '✓');
+    const el = h('button', { class: 'tile' + (kind === 'maybe' ? ' maybe' : '') + (s.selected.has(key) ? ' sel' : ''), title: `${x.date} ${x.title} · 눌러서 크게 보기` },
       h('img', { src: x.img.small_resize || x.img.small, loading: 'lazy', alt: '' }),
       kind === 'maybe' ? h('span', { class: 'tag' }, '확인') : null,
-      h('span', { class: 'check' }, '✓'),
+      check,
     );
-    el.onclick = () => {
-      const fb = fbOf(g.child);
-      const face = (faceMem.get(x.img.id) || [])[x.faceIdx];
-      if (s.selected.has(key)) {
-        s.selected.delete(key);
-        // 우리 아이로 뽑혔던 사진을 빼면 "이 얼굴은 다른 아이"로 기억
-        if (kind === 'sure' && face) fb.neg.set(key, { emb: face.emb });
-        fb.pos.delete(key);
-      } else {
-        s.selected.add(key);
-        // 확인 필요에서 고르면 "이 얼굴은 우리 아이"로 기억
-        if (kind === 'maybe' && face) fb.pos.set(key, { emb: face.emb, date: x.date });
-        fb.neg.delete(key);
-      }
-      el.classList.toggle('sel');
-      updateCount();
-      updateRefine();
+    check.onclick = (e) => {
+      e.stopPropagation();
+      mark(g, x, kind, !s.selected.has(key));
+      check.title = s.selected.has(key) ? '빼기' : '고르기';
     };
+    el.onclick = () => openViewer(items, i);
+    tiles.set(key, el);
     return el;
+  };
+
+  // 크게 보기. 우리 아이로 본 얼굴에 노란 네모를 두르고 옆에 확대해서 보여준다. 다른 얼굴을 누르면 "이 아이가 우리 아이"
+  const SECTION = { sure: '우리 아이', report: '알림장 사진', maybe: '확인이 필요해요' };
+  const faceZoom = (img, [bx, by, bw, bh]) => {
+    const W = img.naturalWidth, H = img.naturalHeight;
+    const side = Math.max(bw * W, bh * H) * 1.8;
+    const cx = (bx + bw / 2) * W, cy = (by + bh / 2) * H;
+    const c = h('canvas', { width: 240, height: 240 });
+    c.getContext('2d').drawImage(img, cx - side / 2, cy - side / 2, side, side, 0, 0, 240, 240);
+    return c;
+  };
+  const openViewer = (items, start) => {
+    let i = start;
+    const info = h('div', { class: 'vw-info' });
+    const state = h('span', { class: 'vw-state' });
+    const closeBtn = h('button', { class: 'vw-close', 'aria-label': '닫기', title: '닫기 (Esc)' }, '✕');
+    const prevBtn = h('button', { class: 'vw-nav', 'aria-label': '이전 사진', title: '이전 (←)' }, '‹');
+    const nextBtn = h('button', { class: 'vw-nav', 'aria-label': '다음 사진', title: '다음 (→)' }, '›');
+    const stage = h('div', { class: 'vw-stage' });
+    const zoom = h('div', { class: 'vw-zoom' });
+    const noBtn = h('button', { class: 'btn ghost' }, '아니에요 ', h('kbd', {}, 'N'));
+    const yesBtn = h('button', { class: 'btn' }, '맞아요 ', h('kbd', {}, 'Y'));
+    const view = h('div', { class: 'viewer', role: 'dialog', 'aria-modal': 'true' },
+      h('div', { class: 'vw-top' }, info, state, closeBtn),
+      h('div', { class: 'vw-main' }, prevBtn, stage, zoom, nextBtn),
+      h('div', { class: 'vw-bottom' }, noBtn, yesBtn,
+        h('div', { class: 'vw-hint' }, '답하면 다음 사진으로 넘어가요 · 노란 네모가 다른 아이면 우리 아이 얼굴을 눌러 주세요 · ← → 이동 · Esc 닫기')),
+    );
+
+    const show = () => {
+      const { g, x, kind } = items[i];
+      const key = `${g.child}:${x.img.id}`;
+      const faces = faceMem.get(x.img.id) || [];
+      const on = s.selected.has(key);
+      info.textContent = `${SECTION[kind]} ${i + 1}/${items.length} · ${x.date} ${x.title}`;
+      state.textContent = on ? '✓ 고른 사진' : '고르지 않은 사진';
+      state.classList.toggle('on', on);
+      const img = h('img', { src: x.img.large || x.img.original, alt: '' });
+      const boxes = faces.map((f, idx) => {
+        if (!f.box) return null;
+        const [bx, by, bw, bh] = f.box;
+        const me = idx === x.faceIdx;
+        const b = h('button', {
+          class: 'vw-face' + (me ? ' me' : ''),
+          title: me ? '우리 아이로 본 얼굴' : '이 아이가 우리 아이예요',
+          style: `left:${bx * 100}%;top:${by * 100}%;width:${bw * 100}%;height:${bh * 100}%`,
+        });
+        b.onclick = () => { mark(g, x, kind, true, idx); show(); };
+        return b;
+      });
+      stage.replaceChildren(h('div', { class: 'vw-frame' }, img, boxes));
+      const f = faces[x.faceIdx];
+      zoom.replaceChildren();
+      zoom.hidden = !f?.box;
+      if (f?.box) img.addEventListener('load', () => zoom.replaceChildren(faceZoom(img, f.box), '우리 아이로 본 얼굴'), { once: true });
+      prevBtn.disabled = i === 0;
+      nextBtn.disabled = i === items.length - 1;
+      const next = items[i + 1];
+      if (next) new Image().src = next.x.img.large || next.x.img.original; // 다음 사진 미리 받기
+    };
+    const go = (d) => {
+      const n = i + d;
+      if (n < 0 || n >= items.length) return;
+      i = n;
+      show();
+    };
+    const answer = (yes) => {
+      const { g, x, kind } = items[i];
+      mark(g, x, kind, yes);
+      if (i === items.length - 1) close();
+      else go(1);
+    };
+    const onKey = (e) => {
+      if (e.code === 'Escape') close();
+      else if (e.code === 'ArrowRight') go(1);
+      else if (e.code === 'ArrowLeft') go(-1);
+      else if (e.code === 'KeyY') answer(true); // 한글 자판(ㅛ)에서도 같은 키
+      else if (e.code === 'KeyN') answer(false); // (ㅜ)
+      else return;
+      e.preventDefault();
+    };
+    const close = () => {
+      document.removeEventListener('keydown', onKey);
+      view.remove();
+      document.body.classList.remove('noscroll');
+      const { g, x } = items[i];
+      tiles.get(`${g.child}:${x.img.id}`)?.scrollIntoView({ block: 'nearest' });
+    };
+    closeBtn.onclick = close;
+    prevBtn.onclick = () => go(-1);
+    nextBtn.onclick = () => go(1);
+    yesBtn.onclick = () => answer(true);
+    noBtn.onclick = () => answer(false);
+    view.onclick = (e) => { if (e.target === view || e.target === stage) close(); };
+    document.addEventListener('keydown', onKey);
+    document.body.classList.add('noscroll');
+    document.body.append(view);
+    show();
   };
   const refineBtn = h('button', { class: 'btn ghost', hidden: true }, '');
   const updateRefine = () => {
-    const n = s.groups.reduce((sum, g) => sum + fbOf(g.child).pos.size + fbOf(g.child).neg.size, 0);
+    // 같은 사진에서 얼굴을 바꿔 고르면 pos와 neg가 함께 생기므로 사진 단위로 센다
+    const n = s.groups.reduce((sum, g) => {
+      const fb = fbOf(g.child);
+      return sum + new Set([...fb.pos.keys(), ...fb.neg.keys()].map((k) => k.split('#')[0])).size;
+    }, 0);
     refineBtn.hidden = !n;
     refineBtn.textContent = `고친 ${n}장을 반영해서 다시 찾기`;
   };
@@ -533,12 +657,15 @@ function drawResults(container) {
     const who = multi ? `${givenName(g.name)} · ` : '';
     const block = (title, note, list, kind) => {
       if (!list.length) return;
-      nodes.push(h('div', { class: 'section-label' }, `${who}${title}`, h('small', {}, `${list.length}장 · ${note}`)));
-      nodes.push(h('div', { class: 'grid' }, list.map((x) => tile(g, x, kind))));
+      const items = list.map((x) => ({ g, x, kind }));
+      const review = h('button', { class: 'linkbtn' }, '하나씩 크게 보기');
+      review.onclick = () => openViewer(items, 0);
+      nodes.push(h('div', { class: 'section-label' }, `${who}${title}`, h('small', {}, `${list.length}장 · ${note}`), review));
+      nodes.push(h('div', { class: 'grid' }, items.map((_, i) => tile(items, i))));
     };
-    block('우리 아이', '아닌 사진은 눌러서 빼 주세요', g.sure, 'sure');
+    block('우리 아이', '사진을 누르면 크게 보여요. 아닌 사진은 체크를 눌러 빼 주세요', g.sure, 'sure');
     block('알림장 사진', '선생님이 우리 아이에게 보낸 사진', g.reports, 'report');
-    block('확인이 필요해요', '우리 아이가 맞으면 눌러서 골라 주세요', g.maybe, 'maybe');
+    block('확인이 필요해요', '하나씩 크게 보면서 Y(맞아요) / N(아니에요)로 빠르게 고를 수 있어요', g.maybe, 'maybe');
     if (multi && !g.sure.length && !g.maybe.length && !g.reports.length) {
       nodes.push(h('div', { class: 'section-label' }, givenName(g.name), h('small', {}, '찾은 사진이 없어요')));
     }

@@ -115,8 +115,46 @@ summary { color: var(--soft); font-size: 13px; cursor: pointer; width: fit-conte
 .tile img { width: 100%; height: 100%; object-fit: cover; display: block; transition: opacity 0.15s; }
 .tile:not(.sel) img { opacity: 0.5; }
 .tile .check {
-  position: absolute; right: 6px; top: 6px; width: 20px; height: 20px; border-radius: 3px;
-  border: 1.5px solid #fff; background: rgba(0, 0, 0, 0.25); color: transparent; font-size: 12px; display: grid; place-items: center;
+  position: absolute; right: 4px; top: 4px; width: 24px; height: 24px; border-radius: 3px;
+  border: 1.5px solid #fff; background: rgba(0, 0, 0, 0.25); color: transparent; font-size: 13px; display: grid; place-items: center;
+}
+.tile .check:hover { box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.5); }
+.tile:hover img { opacity: 1; }
+.linkbtn { float: right; border: 0; background: none; padding: 0; color: var(--pen); font-size: 13px; font-weight: 600; }
+.linkbtn:hover { text-decoration: underline; text-underline-offset: 3px; }
+
+/* ── 크게 보기 ── */
+body.noscroll { overflow: hidden; }
+.viewer {
+  position: fixed; inset: 0; z-index: 50; display: grid; grid-template-rows: auto 1fr auto;
+  background: rgba(14, 15, 17, 0.95); color: #eceef1;
+}
+.vw-top { display: flex; align-items: center; gap: 12px; padding: 12px 16px; font-size: 14px; }
+.vw-info { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #c3c7cd; }
+.vw-state { font-size: 13px; padding: 1px 10px; border: 1px solid #555a61; border-radius: 99px; color: #c3c7cd; white-space: nowrap; }
+.vw-state.on { background: var(--pen); border-color: var(--pen); color: #fff; }
+.vw-close { border: 0; background: none; color: #fff; font-size: 20px; padding: 2px 8px; }
+.vw-main { display: grid; grid-template-columns: 44px 1fr auto 44px; align-items: center; gap: 14px; min-height: 0; padding: 0 10px; }
+.vw-stage { display: grid; place-items: center; height: 100%; min-width: 0; }
+.vw-frame { position: relative; line-height: 0; }
+.vw-frame img { display: block; max-width: calc(100vw - 420px); max-height: calc(100vh - 150px); }
+.vw-face { position: absolute; padding: 0; border: 1.5px dashed rgba(255, 255, 255, 0.7); background: transparent; border-radius: 3px; }
+.vw-face:hover { border-style: solid; border-color: #fff; background: rgba(255, 255, 255, 0.15); }
+.vw-face.me { border: 3px solid #ffd43b; box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6); }
+.vw-zoom { width: 240px; font-size: 12px; color: #9ba1a8; text-align: center; line-height: 1.4; }
+.vw-zoom canvas { display: block; width: 240px; height: 240px; border-radius: 4px; outline: 3px solid #ffd43b; margin-bottom: 8px; }
+.vw-nav { height: 72px; border: 0; border-radius: 4px; background: rgba(255, 255, 255, 0.08); color: #fff; font-size: 30px; line-height: 1; }
+.vw-nav:hover:not(:disabled) { background: rgba(255, 255, 255, 0.16); }
+.vw-nav:disabled { opacity: 0.2; cursor: default; }
+.vw-bottom { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; padding: 14px 16px 16px; }
+.vw-bottom .btn { min-width: 150px; }
+.vw-bottom .btn.ghost { color: #eceef1; border-color: #555a61; }
+.vw-bottom kbd { font: 600 11px var(--sans); padding: 1px 5px; margin-left: 6px; border: 1px solid currentColor; border-radius: 3px; opacity: 0.75; }
+.vw-hint { flex-basis: 100%; text-align: center; font-size: 12px; color: #8b9198; }
+@media (max-width: 900px) {
+  .vw-main { grid-template-columns: 36px 1fr 36px; }
+  .vw-zoom { display: none; }
+  .vw-frame img { max-width: calc(100vw - 110px); }
 }
 .tile.sel .check { background: var(--pen); border-color: var(--pen); color: #fff; }
 .tile .tag { display: none; }

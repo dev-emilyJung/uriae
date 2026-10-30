@@ -145,6 +145,7 @@ export async function detectFaces(src, { withCrops = false } = {}) {
     if (size < MIN_FACE_PX) continue;
     faces.push({
       box: f.box,
+      nbox: [f.box[0] / canvas.width, f.box[1] / canvas.height, f.box[2] / canvas.width, f.box[3] / canvas.height], // 사진 크기 대비 비율
       size,
       emb: await embed(canvas, f.mesh),
       crop: withCrops ? await toDataURL(canvas, f.box) : undefined,
