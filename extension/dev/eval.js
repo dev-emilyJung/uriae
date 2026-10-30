@@ -133,6 +133,25 @@ async function drawUsage() {
       r.maybe, r.maybeYes + r.maybeNo, r.maybeYes, rate(r.maybeYes, r.maybeNo),
     ]),
   ) : h('p', { class: 'note' }, '아직 없음. 압축 해제로 불러온(개발용) 확장에서 사진을 찾고 Y/N을 눌러 주세요.'));
+  // 같은 Y/N 답으로 기존(1.0.1) 방식과 지금 방식 비교: 각 방식이 "우리 아이"로 찾은 사진 중 N 비율, 답한 Y 중 바로 찾은 비율
+  const compared = log.filter((r) => r.samples?.some((s) => s.legacy != null));
+  if (compared.length) {
+    const rows = [];
+    for (const r of [...compared].reverse()) {
+      for (const [name, lv] of [['기존 1.0.1', (s) => s.legacy], ['지금', (s) => s.now]]) {
+        const sure = r.samples.filter((s) => lv(s) === 3);
+        const wrong = sure.filter((s) => !s.yes).length;
+        const yes = r.samples.filter((s) => s.yes);
+        const found = yes.filter((s) => lv(s) === 3).length;
+        const any = yes.filter((s) => lv(s) >= 1).length;
+        rows.push([new Date(r.at).toLocaleString('ko-KR'), name, sure.length, wrong, sure.length ? pct(wrong / sure.length) : '-', yes.length ? pct(found / yes.length) : '-', yes.length ? pct(any / yes.length) : '-']);
+      }
+    }
+    $('usage').append(
+      h('h3', {}, '같은 답으로 두 방식 비교'),
+      table(['찾은 시각', '방식', '우리 아이로 찾음(답한 것)', '그중 N', '잘못 찾는 비율', 'Y 사진 중 바로 찾음', 'Y 사진 중 확인 필요까지'], rows),
+    );
+  }
   // 판정 숫자 내보내기 (사진·얼굴 정보 없음). tests/private/ 에 두면 Claude가 기준을 분석한다
   if (log.some((r) => r.samples?.length)) {
     const btn = h('button', {}, '판정 숫자 내보내기 (face-log.json)');

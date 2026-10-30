@@ -92,6 +92,10 @@ export function judge(emb, faceStat, refs, neg, th) {
 export const SURE_MIN_PX = 48;
 /** 얼굴 윤곽 확신도가 이보다 낮으면(손·옆모습·가려진 얼굴 등) "우리 아이"로 확정하지 않는다 */
 export const SURE_MIN_SCORE = 0.8;
+/** 형제자매 기준 얼굴과의 유사도가 우리 아이와 이만큼 안쪽이면 "확인 필요" */
+export const SIBLING_MARGIN = 0.05;
+/** 자동 기준 얼굴을 가져올 수 있는 사진의 최대 얼굴 수 */
+export const AUTO_MAX_FACES = 3;
 
 /**
  * 1차 판정에서 아주 확실한 얼굴을 기준 얼굴로 추가 (같은 시기의 우리 아이 얼굴이라 다음 판정에 가장 도움이 된다).
@@ -99,9 +103,9 @@ export const SURE_MIN_SCORE = 0.8;
  * 충분히 큰 얼굴만, 점수 높은 순으로 max개까지.
  * cands: [{emb, date, z, raw, size}]
  */
-export function pickAutoRefs(cands, th, { margin = 1, max = 30 } = {}) {
+export function pickAutoRefs(cands, th, { margin = 1, max = 30, maxFaces = Infinity } = {}) {
   return cands
-    .filter((c) => c.z >= th.sure + margin && c.raw >= th.rawSure + 0.1 && c.size >= SURE_MIN_PX * 1.5)
+    .filter((c) => c.z >= th.sure + margin && c.raw >= th.rawSure + 0.1 && c.size >= SURE_MIN_PX * 1.5 && (c.faces ?? 1) <= maxFaces)
     .sort((a, b) => b.z - a.z)
     .slice(0, max)
     .map((c) => ({ emb: c.emb, date: c.date, auto: true }));
@@ -113,9 +117,13 @@ export function pickAutoRefs(cands, th, { margin = 1, max = 30 } = {}) {
  * refs: 등록한 기준 얼굴 [{ emb, date }]
  * pos: 사용자가 "이 얼굴이 우리 아이"라고 확인한 얼굴 [{ emb, date }], neg: "아니에요"라고 한 얼굴 특징값들
  * forced: 사용자가 직접 고친 사진 Map(id → 3 | 0)
- * → Map(id → { level, z, raw, faceIdx })
+ * trusted: 선생님이 이 아이에게 보낸 알림장 사진 [{ id, date, faces }]. 얼굴이 하나뿐인 사진은 거의 이 아이라서
+ *   기준 얼굴과 대체로 맞으면 그 시기의 기준 얼굴로 더한다
+ * others: 같은 계정의 다른 아이(형제자매) 기준 얼굴 [{ emb, date }]. 가장 닮은 아이라 그 아이와 더 닮은 얼굴은 우리 아이가 아니다
+ * legacy: 1.0.1 까지의 판정 (알림장 기준 얼굴·형제자매 비교·자동 기준 얼굴 제한·이웃 비교 없음). 개발용 비교에만 쓴다
+ * → Map(id → { level, z, raw, faceIdx, first, near })
  */
-export function classifyPhotos(photos, refs, { pos = [], neg = [], forced = new Map(), strictness = 0.5 } = {}) {
+export function classifyPhotos(photos, refs, { pos = [], neg = [], forced = new Map(), strictness = 0.5, trusted = [], others = [], legacy = false } = {}) {
   const th = decide(strictness);
   const cohort = sampleCohort(photos.flatMap((p) => p.faces.map((f) => f.emb)), 300);
   // 얼굴별 무리 통계는 계산이 무거워서 얼굴에 붙여 두고, 같은 무리로 다시 판정할 때 재사용한다
@@ -133,14 +141,32 @@ export function classifyPhotos(photos, refs, { pos = [], neg = [], forced = new 
     if (!refStat.has(r)) refStat.set(r, { emb: r.emb, stat: cohortStats(r.emb, cohort) });
     return refStat.get(r);
   };
+  // 알림장 독사진 → 기준 얼굴 (등록한 기준 얼굴과 "확인 필요" 수준 이상으로 맞는 것만)
+  if (!legacy) {
+    const fromReports = [];
+    for (const p of trusted) {
+      const f = p.faces.length === 1 ? p.faces[0] : null;
+      if (!f || f.size < SURE_MIN_PX * 1.5 || (f.score ?? 1) < SURE_MIN_SCORE) continue;
+      const r = judge(f.emb, statOf(f), refsFor(p.date, refs).map(withStat), neg, th);
+      if (r.level >= 1) fromReports.push({ emb: f.emb, date: p.date, auto: true });
+    }
+    refs = [...refs, ...fromReports.slice(0, 80)];
+  }
   const out = new Map();
   const pass = (extra) => {
     for (const p of photos) {
       const rs = refsFor(p.date, [...refs, ...extra]).map(withStat);
       let best = { level: 0, z: -9, raw: 0, faceIdx: -1 };
+      const sib = legacy ? [] : refsFor(p.date, others);
       p.faces.forEach((f, i) => {
         const r = judge(f.emb, statOf(f), rs, neg, th);
         if (r.level === 3 && (f.size < SURE_MIN_PX || (f.score ?? 1) < SURE_MIN_SCORE)) r.level = 1;
+        // 형제자매와 더 닮았으면 우리 아이가 아니고, 거의 비슷하면 확인 필요
+        if (r.level && sib.length) {
+          const s = faceScore(f.emb, sib);
+          if (s >= r.raw) r.level = 0;
+          else if (s >= r.raw - SIBLING_MARGIN && r.level === 3) r.level = 1;
+        }
         if (r.level > best.level || (r.level === best.level && r.z > best.z)) best = { ...r, faceIdx: i };
       });
       if (forced.has(p.id)) best.level = forced.get(p.id);
@@ -156,12 +182,67 @@ export function classifyPhotos(photos, refs, { pos = [], neg = [], forced = new 
     .map((p) => {
       const b = out.get(p.id);
       const f = p.faces[b.faceIdx];
-      return { emb: f.emb, size: f.size, date: p.date, z: b.z, raw: b.raw };
+      return { emb: f.emb, size: f.size, date: p.date, z: b.z, raw: b.raw, faces: p.faces.length };
     });
-  const auto = pickAutoRefs(cands, th);
+  // 자동 기준 얼굴은 얼굴이 적은 사진에서만 (단체사진에서 잘못 고른 얼굴이 기준이 되면 그 아이 사진이 줄줄이 들어온다)
+  const auto = pickAutoRefs(cands, th, legacy ? {} : { maxFaces: AUTO_MAX_FACES });
   if (auto.length) pass([...pos, ...auto]);
   for (const [id, r] of out) r.first = first.get(id);
+  if (!legacy) {
+    const allRefs = [...refs, ...pos, ...auto];
+    checkNeighbors(photos, out, forced, th, (p, f) => ({ raw: faceScore(f.emb, refsFor(p.date, allRefs)) }), (p) => refsFor(p.date, allRefs));
+  }
   return out;
+}
+
+/**
+ * 이웃 비교 설정. n: 평균 낼 가장 닮은 얼굴 수, demote/promote: 비율 기준
+ * 비율 = (기준 얼굴 중 가장 닮은 n개와의 유사도 평균) ÷ (앨범 속 다른 사진 얼굴 중 가장 닮은 n개와의 유사도 평균)
+ */
+export const NEAR = { n: 3, demote: 0.9, promote: 0.97 };
+
+/**
+ * 이웃 비교: "이 얼굴은 자기와 가장 닮은 앨범 속 얼굴들만큼 우리 아이 기준 얼굴과도 닮았나?"
+ * 앨범에는 아이마다 사진이 여러 장 있어서, 어떤 얼굴과 가장 닮은 앨범 속 얼굴은 대개 같은 아이의 다른 사진이다.
+ * 진짜 우리 아이면 기준 얼굴도 같은 아이라 두 유사도가 비슷하고(비율 ≈ 1), 닮은 친구면 자기 사진끼리가 더 닮아서 비율이 낮다.
+ * 한 장씩의 점수는 사진마다 흔들려 겹치지만, 이 비율은 아이 단위로 갈린다
+ * (모의 앨범: 우리 아이 0.88~1.00, 닮은 친구 0.57~0.84, 다른 아이 0.31~0.70). 점수 크기에 상관없는 비율이라 모델·나이가 달라도 쓸 수 있다.
+ * scoreOf(photo, face) → { raw }, refsOf(photo) → 그 사진 날짜의 기준 얼굴들
+ */
+export function checkNeighbors(photos, out, forced, th, scoreOf, refsOf) {
+  const unit = (v) => {
+    let n = 0;
+    for (const x of v) n += x * x;
+    n = Math.sqrt(n) || 1;
+    return Float32Array.from(v, (x) => x / n);
+  };
+  const dot = (a, b) => {
+    let d = 0;
+    for (let i = 0; i < a.length; i++) d += a[i] * b[i];
+    return d;
+  };
+  const topMean = (xs) => {
+    xs.sort((a, b) => b - a);
+    const t = xs.slice(0, NEAR.n);
+    return t.reduce((s, x) => s + x, 0) / t.length;
+  };
+  // 비교 무리: 우리 아이와 어느 정도 닮은 얼굴(확인 필요 하한 이상)만. 다른 아이 얼굴은 비교에 쓸 일이 없고 계산만 늘린다
+  const pool = [];
+  for (const p of photos) for (const f of p.faces) if (scoreOf(p, f).raw >= th.rawMaybe) pool.push({ p, f, u: unit(f.emb) });
+  for (const p of photos) {
+    const r = out.get(p.id);
+    if (!r.level || forced.has(p.id) || r.faceIdx < 0) continue;
+    const f = p.faces[r.faceIdx];
+    const u = unit(f.emb);
+    // 앨범 속 다른 사진의 얼굴 (자기 자신·같은 사진·자동 기준 얼굴로 쓰인 같은 얼굴은 뺀다)
+    const album = pool.filter((o) => o.p !== p).map((o) => dot(u, o.u));
+    const refs = refsOf(p).filter((x) => x.emb !== f.emb).map((x) => dot(u, unit(x.emb)));
+    if (album.length < NEAR.n || !refs.length) continue;
+    const ratio = topMean(refs) / Math.max(topMean(album), 1e-6);
+    r.near = ratio;
+    if (r.level === 3 && ratio < NEAR.demote) r.level = 1;
+    else if (r.level === 1 && ratio >= NEAR.promote && r.raw >= th.rawSure && f.size >= SURE_MIN_PX && (f.score ?? 1) >= SURE_MIN_SCORE) r.level = 3;
+  }
 }
 
 /** 시기마다 권장하는 기준 얼굴 수. 최소 2개면 찾을 수 있고, 5개면 각도·표정이 섞여 단체사진에서도 잘 찾는다 */

@@ -460,9 +460,12 @@ async function showPhotos(flash = '') {
   for (const k of kids) await upgradeRefs(k.child);
   const withRefs = [];
   const noRefs = [];
+  const everyone = kidsOf(enrollments);
   for (const k of kids) {
     k.refs = await store.get(K.refs(k.child), []);
     k.periods = await periodsOf(k);
+    k.others = [];
+    for (const o of everyone) if (o.child !== k.child) k.others.push(...(await store.get(K.refs(o.child), [])));
     (k.refs.length >= REF_MIN ? withRefs : noRefs).push(k);
   }
   if (!withRefs.length) {
@@ -535,16 +538,20 @@ function classifyKid(kid, mine, reports, strictness) {
     if (fb.pos.has(key)) forced.set(j.img.id, 3);
     if (fb.neg.has(key)) forced.set(j.img.id, 0);
   }
-  const res = matchLib.classifyPhotos(
-    mine.map((j) => ({ id: j.img.id, date: j.date, faces: faceMem.get(j.img.id) || [] })),
-    kid.refs,
-    {
-      pos: [...fb.pos.values()].map((p) => ({ emb: p.emb, date: p.date })),
-      neg: [...fb.neg.values()].map((n) => n.emb),
-      forced,
-      strictness,
-    },
-  );
+  const photos = mine.map((j) => ({ id: j.img.id, date: j.date, faces: faceMem.get(j.img.id) || [] }));
+  const opts = {
+    pos: [...fb.pos.values()].map((p) => ({ emb: p.emb, date: p.date })),
+    neg: [...fb.neg.values()].map((n) => n.emb),
+    forced,
+    strictness,
+    // 선생님이 이 아이에게 보낸 알림장 사진 (독사진은 기준 얼굴로 더한다)
+    trusted: reports.map((j) => ({ id: j.img.id, date: j.date, faces: faceMem.get(j.img.id) || [] })),
+    // 형제자매 기준 얼굴 (가장 닮은 아이라 그 아이와 더 닮은 얼굴은 우리 아이가 아니다)
+    others: kid.others || [],
+  };
+  const res = matchLib.classifyPhotos(photos, kid.refs, opts);
+  // 개발용: 1.0.1 방식 판정도 함께 남겨 Y/N 답으로 두 방식을 비교한다
+  const old = DEV ? matchLib.classifyPhotos(photos, kid.refs, { ...opts, legacy: true }) : null;
   for (const j of mine) {
     const r = res.get(j.img.id);
     j.level = r.level;
@@ -552,6 +559,13 @@ function classifyKid(kid, mine, reports, strictness) {
     j.raw = r.raw;
     j.faceIdx = r.faceIdx;
     j.first = r.first;
+    j.near = r.near;
+    if (old) {
+      j.legacy = old.get(j.img.id).level;
+      j.levelNow = r.level;
+      // 기존 방식은 찾았는데 새 방식이 뺀 사진도 Y/N을 받을 수 있게 확인 필요에 보인다 (개발용 설치에서만)
+      if (j.legacy && !j.level) j.level = 1;
+    }
   }
   return {
     child: kid.child,
@@ -677,7 +691,10 @@ async function runSearch({ since, until, label }, kids, ui) {
             const faces = faceMem.get(j.img.id) || [];
             const f = faces[j.faceIdx] || {};
             first.set(key, kind);
-            info.set(key, { z: +j.score.toFixed(3), raw: +j.raw.toFixed(3), size: Math.round(f.size || 0), score: +(f.score ?? 1).toFixed(2), faces: faces.length, pass1: j.first });
+            info.set(key, {
+              z: +j.score.toFixed(3), raw: +j.raw.toFixed(3), size: Math.round(f.size || 0), score: +(f.score ?? 1).toFixed(2), faces: faces.length, pass1: j.first,
+              now: j.levelNow, legacy: j.legacy, near: j.near == null ? null : +j.near.toFixed(3),
+            });
           }
         }
       }
