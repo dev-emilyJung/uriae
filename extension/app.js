@@ -797,21 +797,24 @@ function drawResults(container) {
     const info = h('div', { class: 'vw-info' });
     const state = h('span', { class: 'vw-state' });
     const closeBtn = h('button', { class: 'vw-close', 'aria-label': '닫기', title: '닫기 (Esc)' }, '✕');
-    const prevBtn = h('button', { class: 'vw-nav', 'aria-label': '이전 사진', title: '이전 (←)' }, '‹');
-    const nextBtn = h('button', { class: 'vw-nav', 'aria-label': '다음 사진', title: '다음 (→)' }, '›');
+    const prevBtn = h('button', { class: 'vw-nav', title: '이전 사진 (←)' }, h('kbd', {}, '←'), '이전');
+    const nextBtn = h('button', { class: 'vw-nav', title: '다음 사진 (→)' }, '다음', h('kbd', {}, '→'));
     const stage = h('div', { class: 'vw-stage' });
     const zoom = h('div', { class: 'vw-zoom' });
     const count = h('span', { class: 'vw-count' });
     const noBtn = h('button', { class: 'btn ghost vw-answer' }, h('kbd', {}, 'N'), '아니에요');
     const yesBtn = h('button', { class: 'btn vw-answer' }, h('kbd', {}, 'Y'), '맞아요');
-    const key = (k, label) => h('span', { class: 'vw-key' }, h('kbd', {}, k), label);
+    // 오른쪽 조작 패널: 확대한 얼굴을 보고 바로 아래에서 답한다 (자주 누르는 순서: 맞아요 > 아니에요 > 이전·다음)
     const view = h('div', { class: 'viewer', role: 'dialog', 'aria-modal': 'true' },
       h('div', { class: 'vw-top' }, count, info, state, closeBtn),
-      h('div', { class: 'vw-main' }, prevBtn, stage, zoom, nextBtn),
-      h('div', { class: 'vw-bottom' }, noBtn, yesBtn,
-        // 키보드로 빠르게: 크게 보여서 처음 보는 사람도 알 수 있게
-        h('div', { class: 'vw-keys' }, key('Y', '맞아요'), key('N', '아니에요'), h('span', { class: 'vw-key' }, h('kbd', {}, '←'), h('kbd', {}, '→'), '넘기기'), key('Esc', '닫기')),
-        h('div', { class: 'vw-hint' }, '답하면 다음 사진으로 넘어가요. 노란 네모가 다른 아이면 사진 속 우리 아이 얼굴을 눌러 주세요.')),
+      h('div', { class: 'vw-main' }, stage,
+        h('div', { class: 'vw-panel' },
+          zoom,
+          yesBtn,
+          noBtn,
+          h('div', { class: 'vw-navs' }, prevBtn, nextBtn),
+          h('div', { class: 'vw-hint' }, '마우스로 누르거나 키보드 Y · N · ← → 로 빠르게. 답하면 다음 사진으로 넘어가요.'),
+          h('div', { class: 'vw-hint' }, '노란 네모가 다른 아이면 사진 속 우리 아이 얼굴을 눌러 주세요. Esc 닫기'))),
     );
 
     const show = () => {
