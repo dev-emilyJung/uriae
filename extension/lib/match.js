@@ -107,6 +107,61 @@ export function pickAutoRefs(cands, th, { margin = 1, max = 30 } = {}) {
     .map((c) => ({ emb: c.emb, date: c.date, auto: true }));
 }
 
+/**
+ * 한 아이의 사진들 판정 (앱과 측정 도구가 같은 코드를 쓴다).
+ * photos: [{ id, date, faces: [{ emb, size, score }] }]  비교 무리(코호트)도 이 사진들의 얼굴에서 뽑는다
+ * refs: 등록한 기준 얼굴 [{ emb, date }]
+ * pos: 사용자가 "이 얼굴이 우리 아이"라고 확인한 얼굴 [{ emb, date }], neg: "아니에요"라고 한 얼굴 특징값들
+ * forced: 사용자가 직접 고친 사진 Map(id → 3 | 0)
+ * → Map(id → { level, z, raw, faceIdx })
+ */
+export function classifyPhotos(photos, refs, { pos = [], neg = [], forced = new Map(), strictness = 0.5 } = {}) {
+  const th = decide(strictness);
+  const cohort = sampleCohort(photos.flatMap((p) => p.faces.map((f) => f.emb)), 300);
+  // 얼굴별 무리 통계는 계산이 무거워서 얼굴에 붙여 두고, 같은 무리로 다시 판정할 때 재사용한다
+  const sig = `${cohort.length}:${photos.length}`;
+  const statOf = (f) => {
+    if (f.statSig !== sig || f.statCohort !== cohort[0]) {
+      f.stat = cohortStats(f.emb, cohort);
+      f.statSig = sig;
+      f.statCohort = cohort[0];
+    }
+    return f.stat;
+  };
+  const refStat = new Map();
+  const withStat = (r) => {
+    if (!refStat.has(r)) refStat.set(r, { emb: r.emb, stat: cohortStats(r.emb, cohort) });
+    return refStat.get(r);
+  };
+  const out = new Map();
+  const pass = (extra) => {
+    for (const p of photos) {
+      const rs = refsFor(p.date, [...refs, ...extra]).map(withStat);
+      let best = { level: 0, z: -9, raw: 0, faceIdx: -1 };
+      p.faces.forEach((f, i) => {
+        const r = judge(f.emb, statOf(f), rs, neg, th);
+        if (r.level === 3 && (f.size < SURE_MIN_PX || (f.score ?? 1) < SURE_MIN_SCORE)) r.level = 1;
+        if (r.level > best.level || (r.level === best.level && r.z > best.z)) best = { ...r, faceIdx: i };
+      });
+      if (forced.has(p.id)) best.level = forced.get(p.id);
+      out.set(p.id, best);
+    }
+  };
+  // 1차: 등록한 기준 얼굴 + 사용자가 확인한 얼굴
+  pass(pos);
+  // 2차: 1차에서 아주 확실했던 얼굴을 같은 시기 기준 얼굴로 더해 다시 판정 (사용자가 "아니에요"라고 한 사진은 제외)
+  const cands = photos
+    .filter((p) => out.get(p.id).level === 3 && out.get(p.id).faceIdx >= 0 && forced.get(p.id) !== 0)
+    .map((p) => {
+      const b = out.get(p.id);
+      const f = p.faces[b.faceIdx];
+      return { emb: f.emb, size: f.size, date: p.date, z: b.z, raw: b.raw };
+    });
+  const auto = pickAutoRefs(cands, th);
+  if (auto.length) pass([...pos, ...auto]);
+  return out;
+}
+
 /** 시기마다 권장하는 기준 얼굴 수. 최소 2개면 찾을 수 있고, 5개면 각도·표정이 섞여 단체사진에서도 잘 찾는다 */
 export const REF_MIN = 2;
 export const REF_GOAL = 5;

@@ -1,4 +1,4 @@
-// 크롬 웹스토어 업로드용 zip 생성 (extension 폴더만)
+// 크롬 웹스토어 업로드용 zip 생성 (extension 폴더만, 개발용 dev 폴더 제외)
 import JSZip from 'jszip';
 import { readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
@@ -6,6 +6,7 @@ const root = 'extension';
 const zip = new JSZip();
 const walk = (d) => readdirSync(d).forEach((f) => {
   const p = join(d, f);
+  if (p === join(root, 'dev')) return;
   statSync(p).isDirectory() ? walk(p) : zip.file(relative(root, p).replaceAll('\\', '/'), readFileSync(p));
 });
 walk(root);

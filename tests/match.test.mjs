@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { cosine, refsFor, faceScore, decide, judge, cohortStats, agePeriods, pickAutoRefs, missingPeriods, searchRanges, recentPeriods } from '../extension/lib/match.js';
+import { cosine, refsFor, faceScore, decide, judge, cohortStats, agePeriods, pickAutoRefs, missingPeriods, searchRanges, recentPeriods, classifyPhotos } from '../extension/lib/match.js';
 
 test('cosine', () => {
   assert.equal(Math.round(cosine([1, 0], [1, 0]) * 100), 100);
@@ -84,4 +84,22 @@ test('생년월일 모를 때: 6개월씩 거슬러 올라가고, 1년 단위 �
   const r = searchRanges('2026-10-30', recentPeriods('2026-10-30', 3), false);
   assert.ok(r[5].label.startsWith('1~2년 전'));
   assert.equal(r.length, 7);
+});
+
+test('사진 판정: 우리 아이 사진은 찾고, 작은 얼굴은 확인 필요, 고친 사진은 그대로', () => {
+  // 우리 아이는 [1,0,...] 방향, 다른 아이들은 각자 다른 방향
+  const dim = 12;
+  const vec = (axis, k) => Array.from({ length: dim }, (_, i) => (i === axis ? 1 : 0.04 * Math.sin(k * 5 + i * 3 + axis)));
+  const photos = [];
+  for (let k = 0; k < 40; k++) photos.push({ id: `o${k}`, faces: [{ emb: vec(1 + (k % 10), k), size: 120, score: 0.95 }] });
+  photos.push({ id: 'me', faces: [{ emb: vec(0, 1), size: 120, score: 0.95 }, { emb: vec(3, 99), size: 120, score: 0.95 }] });
+  photos.push({ id: 'small', faces: [{ emb: vec(0, 2), size: 40, score: 0.95 }] });
+  photos.push({ id: 'fixed', faces: [{ emb: vec(0, 3), size: 120, score: 0.95 }] });
+  const refs = [{ emb: vec(0, 7) }, { emb: vec(0, 8) }];
+  const r = classifyPhotos(photos, refs, { forced: new Map([['fixed', 0]]) });
+  assert.equal(r.get('me').level, 3);
+  assert.equal(r.get('me').faceIdx, 0);
+  assert.equal(r.get('small').level, 1);
+  assert.equal(r.get('fixed').level, 0);
+  assert.ok(photos.filter((p) => p.id.startsWith('o')).every((p) => r.get(p.id).level < 3));
 });
