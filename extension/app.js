@@ -358,7 +358,9 @@ function classifyKid(kid, mine, reports, strictness) {
   return {
     child: kid.child,
     name: kid.name,
-    reports: [...reports].sort((a, b) => b.date.localeCompare(a.date)),
+    // 알림장 사진 중 얼굴이 하나도 없는 것(안내문·배치도 등)은 따로. 아직 확인 못 한 사진은 사진으로 둔다
+    reports: reports.filter((j) => faceMem.get(j.img.id)?.length !== 0).sort((a, b) => b.date.localeCompare(a.date)),
+    notices: reports.filter((j) => faceMem.get(j.img.id)?.length === 0).sort((a, b) => b.date.localeCompare(a.date)),
     sure: mine.filter((j) => j.level === 3).sort((a, b) => b.date.localeCompare(a.date)),
     maybe: mine.filter((j) => j.level === 1).sort((a, b) => b.score - a.score).slice(0, 300),
     total: mine.length,
@@ -405,11 +407,12 @@ async function runSearch(days, kids, ui) {
       }
     }
 
-    // 2) 앨범 사진 속 얼굴 찾기. 얼굴 특징값은 이 탭이 열려 있는 동안 메모리에만 두고 저장하지 않는다.
+    // 2) 앨범·알림장 사진 속 얼굴 찾기. 얼굴 특징값은 이 탭이 열려 있는 동안 메모리에만 두고 저장하지 않는다.
     //    얼굴을 찾는 동안 다음 사진 몇 장을 미리 받아 두어 다운로드 대기 시간을 줄인다.
     const PREFETCH = 6;
-    const todo = albumJobs.filter((j) => !faceMem.has(j.img.id));
-    const total = albumJobs.length;
+    // 알림장 사진도 얼굴을 확인해서, 얼굴이 없는 첨부(안내문·배치도 등)는 따로 모은다
+    const todo = [...reportJobs, ...albumJobs].filter((j) => !faceMem.has(j.img.id));
+    const total = reportJobs.length + albumJobs.length;
     let done = total - todo.length;
     const started = Date.now();
     const clock = (t) => new Date(t).toLocaleTimeString('ko-KR', { hour: 'numeric', minute: '2-digit' });
@@ -426,7 +429,7 @@ async function runSearch(days, kids, ui) {
         const left = per * (total - done);
         eta = `예상 완료 ${clock(Date.now() + left)} (${dur(left)} 남음)`;
       }
-      ui.status.textContent = `앨범 사진 ${total.toLocaleString('ko-KR')}장 중 ${done.toLocaleString('ko-KR')}장 확인 · 시작 ${clock(started)} · ${eta}`;
+      ui.status.textContent = `사진 ${total.toLocaleString('ko-KR')}장 중 ${done.toLocaleString('ko-KR')}장 확인 · 시작 ${clock(started)} · ${eta}`;
     };
     const urlOf = (j) => j.img.large || j.img.original;
     const pending = new Map();
@@ -534,7 +537,7 @@ function drawResults(container) {
   };
 
   // 크게 보기. 우리 아이로 본 얼굴에 노란 네모를 두르고 옆에 확대해서 보여준다. 다른 얼굴을 누르면 "이 아이가 우리 아이"
-  const SECTION = { sure: '우리 아이', report: '알림장 사진', maybe: '확인이 필요해요' };
+  const SECTION = { sure: '우리 아이', report: '알림장 사진', notice: '알림장 첨부 자료', maybe: '확인이 필요해요' };
   const faceZoom = (img, [bx, by, bw, bh]) => {
     const W = img.naturalWidth, H = img.naturalHeight;
     const side = Math.max(bw * W, bh * H) * 1.8;
@@ -665,12 +668,13 @@ function drawResults(container) {
     };
     block('우리 아이', '사진을 누르면 크게 보여요. 아닌 사진은 체크를 눌러 빼 주세요', g.sure, 'sure');
     block('알림장 사진', '선생님이 우리 아이에게 보낸 사진', g.reports, 'report');
+    block('알림장 첨부 자료', '얼굴이 없는 사진(안내문·배치도 등) · 필요하면 체크해서 받으세요', g.notices, 'notice');
     block('확인이 필요해요', '하나씩 크게 보면서 Y(맞아요) / N(아니에요)로 빠르게 고를 수 있어요', g.maybe, 'maybe');
-    if (multi && !g.sure.length && !g.maybe.length && !g.reports.length) {
+    if (multi && !g.sure.length && !g.maybe.length && !g.reports.length && !g.notices.length) {
       nodes.push(h('div', { class: 'section-label' }, givenName(g.name), h('small', {}, '찾은 사진이 없어요')));
     }
   }
-  const all = s.groups.flatMap((g) => [...g.sure, ...g.reports, ...g.maybe].map((x) => ({ g, x })));
+  const all = s.groups.flatMap((g) => [...g.sure, ...g.reports, ...g.notices, ...g.maybe].map((x) => ({ g, x })));
   dlBtn.onclick = () => {
     const picked = all.filter(({ g, x }) => s.selected.has(`${g.child}:${x.img.id}`))
       .map(({ g, x }) => ({ ...x, folder: multi ? givenName(g.name) : '' }));
