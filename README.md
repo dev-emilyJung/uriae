@@ -56,13 +56,18 @@
 
 ## 설치
 
-> 크롬 웹스토어 등록 전까지는 직접 설치 방식입니다.
+1. [크롬 웹스토어](https://chromewebstore.google.com/detail/pbadjleoagbglgabmmclkmplifcmlfen)에서 **Chrome에 추가**
+2. [키즈노트 웹](https://www.kidsnote.com)에 로그인
+3. 툴바의 🙂 아이콘 클릭
+
+<details>
+<summary>코드에서 직접 설치하기 (개발용)</summary>
 
 1. 이 저장소를 내려받습니다 (`Code` → `Download ZIP` 후 압축 해제)
 2. 크롬에서 `chrome://extensions` 열기 → 오른쪽 위 **개발자 모드** 켜기
 3. **압축해제된 확장 프로그램을 로드합니다** → `extension` 폴더 선택
-4. [키즈노트 웹](https://www.kidsnote.com)에 로그인
-5. 툴바의 🙂 아이콘 클릭
+
+</details>
 
 ## 개발
 
@@ -101,7 +106,7 @@ PR을 보내주시면 기여자 라이선스 동의(CLA)를 요청드립니다.
 
 ## 응원하기
 
-이 도구는 **모든 기능이 무료**입니다. 도움이 되셨다면 이 저장소에 ⭐ 별을 눌러 주시거나, 주변 부모님들께 알려 주세요.
+이 도구는 **모든 기능이 무료**입니다. 도움이 되셨다면 [웹스토어](https://chromewebstore.google.com/detail/pbadjleoagbglgabmmclkmplifcmlfen)에 후기를 남기거나 이 저장소에 ⭐ 별을 눌러 주시고, 주변 부모님들께 알려 주세요.
 
 후기·불편한 점·바라는 기능은 홈페이지의 [의견 보내기](https://uriae.emilysoft.com/#feedback)로 보내 주세요. 확장 화면 아래쪽의 "의견 보내기" 링크로도 갈 수 있습니다.
 
