@@ -54,6 +54,7 @@ $('load').onclick = async () => {
     posts = [...map.values()].sort((a, b) => b.date.localeCompare(a.date));
     draw();
     $('export').disabled = false;
+    $('exportRaw').disabled = false;
   } catch (e) {
     $('status').textContent = e instanceof NotLoggedInError ? '키즈노트 웹에 먼저 로그인해 주세요.' : '오류: ' + (e.message || e);
   } finally {
@@ -118,13 +119,25 @@ function postView(p) {
 /** 아이 이름 가리기 (선생님 이름 등은 내려받은 파일에서 한 번 더 확인해 주세요) */
 const mask = (s) => names.reduce((t, n) => t.split(n).join('○○'), s || '');
 
+const download = (name, data) => {
+  const blob = new Blob([JSON.stringify({ exportedAt: new Date().toISOString(), ...data }, null, 1)], { type: 'application/json' });
+  h('a', { href: URL.createObjectURL(blob), download: name }).click();
+};
+const masked = (p) => ({ key: p.key, source: p.source, date: p.date, title: mask(p.title), content: mask(p.content), imgText: mask(p.imgText) });
+
 $('export').onclick = () => {
   const cases = posts.filter((p) => labels[p.key]?.ok).map((p) => ({
-    key: p.key, source: p.source, date: p.date, title: mask(p.title), content: mask(p.content), imgText: mask(p.imgText),
+    ...masked(p),
     expect: { prep: labels[p.key].prep.map(mask), date: labels[p.key].date },
   }));
-  const blob = new Blob([JSON.stringify({ exportedAt: new Date().toISOString(), cases }, null, 1)], { type: 'application/json' });
-  const a = h('a', { href: URL.createObjectURL(blob), download: 'prep-cases.json' });
-  a.click();
+  download('prep-cases.json', { cases });
   $('status').textContent = `정답 ${cases.length}개를 내려받았어요. tests/private/prep-cases.json 으로 옮겨 주세요.`;
 };
+
+// 정답 없이 원문만 (Claude가 읽고 정답을 만든다). 준비물이 없는 일상 글도 잘못 뽑는지 보려고 모두 넣는다
+$('exportRaw').onclick = () => {
+  download('prep-raw.json', { posts: posts.map(masked) });
+  $('status').textContent = `글 ${posts.length}개를 내려받았어요. tests/private/ 폴더에 넣어 주세요.`;
+};
+
+$('load').click(); // 열자마자 불러오기

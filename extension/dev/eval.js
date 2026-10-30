@@ -121,6 +121,21 @@ function drawHistory(list = loadHistory()) {
     list.map((r) => [r.at, r.memo, r.people, r.faces, r.noFace, r.msPer, r.eer == null ? '-' : pct(r.eer), r.tar01 == null ? '-' : pct(r.tar01), r.hit, r.maybe, r.miss, r.wrong]),
   ) : h('p', { class: 'note' }, '아직 없음'));
 }
+async function drawUsage() {
+  const { store, K } = await import('../lib/store.js');
+  const log = await store.get(K.faceLog, []);
+  const rate = (a, b) => (a + b ? pct(a / (a + b)) : '-');
+  $('usage').replaceChildren(log.length ? table(
+    ['찾은 시각', '기간', '기준', '우리 아이', '확인한 수', '잘못 찾음(N)', '잘못 찾는 비율', '확인 필요', '확인한 수', '놓칠 뻔함(Y)', '그중 우리 아이 비율'],
+    [...log].reverse().map((r) => [
+      new Date(r.at).toLocaleString('ko-KR'), r.label || '', r.strictness,
+      r.sure, r.sureYes + r.sureNo, r.sureNo, rate(r.sureNo, r.sureYes),
+      r.maybe, r.maybeYes + r.maybeNo, r.maybeYes, rate(r.maybeYes, r.maybeNo),
+    ]),
+  ) : h('p', { class: 'note' }, '아직 없음. 압축 해제로 불러온(개발용) 확장에서 사진을 찾고 Y/N을 눌러 주세요.'));
+}
+drawUsage();
+
 $('clear').onclick = () => {
   try { localStorage.removeItem(HISTORY); } catch { /* 무시 */ }
   drawHistory([]);

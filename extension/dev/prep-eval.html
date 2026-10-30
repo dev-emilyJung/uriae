@@ -24,7 +24,9 @@
 <body>
   <h1>알림장 추출 정답 만들기 (개발용)</h1>
   <p class="note">
-    최근 알림장·공지에서 뽑은 준비물과 날짜를 보고 바로잡아 주세요. 틀린 준비물은 ✗, 빠진 준비물은 아래 칸에 한 줄에 하나씩,
+    <b>간단히:</b> 열면 최근 90일치를 자동으로 불러와요. <b>원문 내보내기</b>를 누르면 아이 이름을 가린 <code>prep-raw.json</code> 이 내려받아지고,
+    <code>tests/private/</code> 에 넣으면 Claude가 정답을 만들어 채점합니다.<br />
+    직접 정답을 만들 때: 최근 알림장·공지에서 뽑은 준비물과 날짜를 보고 바로잡아 주세요. 틀린 준비물은 ✗, 빠진 준비물은 아래 칸에 한 줄에 하나씩,
     날짜가 틀리면 고친 뒤 <b>확인 완료</b>를 누르면 됩니다. 고친 내용은 이 브라우저에만 저장되고,
     <b>정답 파일 받기</b>로 아이 이름을 가린 파일을 내려받아 <code>tests/private/prep-cases.json</code> 에 두면 채점 테스트가 읽습니다.
     이 파일은 저장소에 올라가지 않습니다(.gitignore).
@@ -33,6 +35,7 @@
     <select id="days"><option value="30">최근 30일</option><option value="90" selected>최근 90일</option><option value="180">최근 180일</option></select>
     <label><input type="checkbox" id="onlyFound" checked /> 뭔가 뽑힌 글 + 준비물 낱말이 있는 글만</label>
     <button id="load">불러오기</button>
+    <button id="exportRaw" disabled><b>원문 내보내기</b></button>
     <button id="export" disabled>정답 파일 받기</button>
     <span id="status" class="note"></span>
   </div>

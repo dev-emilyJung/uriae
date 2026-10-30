@@ -5,6 +5,13 @@ import { store, K } from './lib/store.js';
 const main = document.getElementById('main');
 // 홈페이지 "의견 보내기"로 갈 때 어느 버전에서 왔는지 함께 (주소에만 붙고, 이용자가 직접 보낼 때만 기록된다)
 document.getElementById('feedbackLink').href = `https://uriae.emilysoft.com/?from=extension&v=${chrome.runtime.getManifest().version}#feedback`;
+// 개발용 설치에서만: 측정 페이지 바로가기 (dev 폴더는 스토어 zip에 없다)
+if (!('update_url' in chrome.runtime.getManifest())) {
+  document.querySelector('.foot').append(
+    Object.assign(document.createElement('a'), { href: 'dev/eval.html', target: '_blank', textContent: '개발: 얼굴 측정' }),
+    Object.assign(document.createElement('a'), { href: 'dev/prep-eval.html', target: '_blank', textContent: '개발: 알림장 내보내기' }),
+  );
+}
 const classBar = document.getElementById('classBar');
 const WEEK = ['일', '월', '화', '수', '목', '금', '토'];
 
@@ -428,6 +435,17 @@ async function readDocImages(run, posts, ocr, status, draw) {
 // 저장: 사진별 얼굴 점수(숫자)만 저장. 다른 아이들의 얼굴 특징값은 저장하지 않는다.
 let stopRequested = false;
 let photoState = null;
+// 개발용 설치(압축 해제 로드)인지. 스토어 설치에는 update_url 이 있다
+const DEV = !('update_url' in chrome.runtime.getManifest());
+
+/** 사진 찾기 정확도 기록 (개발용): 처음 판정별로 Y/N 답 수만 남긴다. dev/eval.html 에서 본다 */
+async function saveFaceLog(log) {
+  const c = { sureYes: 0, sureNo: 0, maybeYes: 0, maybeNo: 0 };
+  for (const [key, yes] of log.answers) c[`${log.first.get(key)}${yes ? 'Yes' : 'No'}`]++;
+  const entry = { at: log.at, label: log.label, strictness: log.strictness, sure: log.sure, maybe: log.maybe, ...c };
+  const list = (await store.get(K.faceLog, [])).filter((x) => x.at !== log.at);
+  await store.set(K.faceLog, [...list, entry].slice(-50));
+}
 const faceMem = new Map(); // 사진 id → 얼굴 특징값 (이 탭이 열려 있는 동안만, 저장 안 함)
 const selSig = () => [...selected].sort().join(',');
 const refsSig = (refs) => refs.map((r) => r.id).sort().join(',');
@@ -545,7 +563,7 @@ function classifyKid(kid, mine, reports, strictness) {
 }
 let matchLib = null;
 
-async function runSearch({ since, until }, kids, ui) {
+async function runSearch({ since, until, label }, kids, ui) {
   matchLib = await import('./lib/match.js');
   const { initFace, detectFaces } = await import('./lib/face.js');
 
@@ -645,6 +663,15 @@ async function runSearch({ since, until }, kids, ui) {
       groups,
       selected: new Set(groups.flatMap((g) => [...g.reports, ...g.sure].map((j) => `${g.child}:${j.img.id}`))),
     };
+    if (DEV) {
+      // 처음 판정(고치기 전)을 기준으로 Y/N 답을 모아 정확도를 잰다 (숫자만, 개발용 설치에서만)
+      const first = new Map();
+      for (const g of groups) {
+        for (const j of g.sure) first.set(`${g.child}:${j.img.id}`, 'sure');
+        for (const j of g.maybe) first.set(`${g.child}:${j.img.id}`, 'maybe');
+      }
+      photoState.log = { at: Date.now(), label, strictness, sure: groups.reduce((n, g) => n + g.sure.length, 0), maybe: groups.reduce((n, g) => n + g.maybe.length, 0), first, answers: new Map() };
+    }
     drawResults(ui.results);
     ui.status.textContent = summaryText(groups);
   } catch (e) {
@@ -701,6 +728,10 @@ function drawResults(container) {
     tiles.get(key)?.classList.toggle('sel', yes);
     updateCount();
     updateRefine();
+    if (s.log?.first.has(key)) {
+      s.log.answers.set(key, yes);
+      saveFaceLog(s.log);
+    }
   };
 
   const tile = (items, i) => {
