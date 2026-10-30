@@ -43,6 +43,9 @@ let embedder;
 export async function initFace() {
   if (human && embedder) return human;
   human = new Human(config);
+  // 다른 탭을 보고 있으면 크롬이 타이머를 최대 1분에 한 번으로 늦춘다. GPU 결과를 기다리는 확인을
+  // 타이머 대신 postMessage로 하게 해서 탭이 가려져 있어도 속도가 유지되게 한다.
+  human.tf.env().set('USE_SETTIMEOUTCUSTOM', true);
   await human.load();
   embedder = await human.tf.loadGraphModel(chrome.runtime.getURL('vendor/models/insightface-mobilenet-swish.json'));
   return human;
