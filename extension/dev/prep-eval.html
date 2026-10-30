@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <title>알림장 추출 정답 만들기</title>
+  <style>
+    body { font: 14px/1.55 system-ui, sans-serif; margin: 24px auto; max-width: 1100px; padding: 0 16px; color: #222; background: #fff; }
+    h1 { font-size: 20px; } .note { color: #666; }
+    .bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; position: sticky; top: 0; background: #fff; padding: 8px 0; border-bottom: 1px solid #ddd; z-index: 1; }
+    .post { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; padding: 16px 0; border-bottom: 1px solid #ddd; }
+    .post.ok { background: #f3faf4; }
+    .raw { white-space: pre-wrap; font-size: 13px; max-height: 360px; overflow: auto; background: #f7f7f8; padding: 8px 10px; border-radius: 4px; }
+    .meta { font-size: 12px; color: #666; margin-bottom: 4px; }
+    .items { list-style: none; padding: 0; margin: 6px 0; }
+    .items li { display: flex; gap: 8px; align-items: baseline; padding: 2px 0; }
+    .items li.bad span { text-decoration: line-through; color: #c0392b; }
+    .items button { font-size: 12px; }
+    textarea { width: 100%; min-height: 54px; font: inherit; font-size: 13px; box-sizing: border-box; }
+    input[type=date] { font: inherit; }
+    .row { margin: 8px 0; }
+    @media (max-width: 760px) { .post { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <h1>알림장 추출 정답 만들기 (개발용)</h1>
+  <p class="note">
+    최근 알림장·공지에서 뽑은 준비물과 날짜를 보고 바로잡아 주세요. 틀린 준비물은 ✗, 빠진 준비물은 아래 칸에 한 줄에 하나씩,
+    날짜가 틀리면 고친 뒤 <b>확인 완료</b>를 누르면 됩니다. 고친 내용은 이 브라우저에만 저장되고,
+    <b>정답 파일 받기</b>로 아이 이름을 가린 파일을 내려받아 <code>tests/private/prep-cases.json</code> 에 두면 채점 테스트가 읽습니다.
+    이 파일은 저장소에 올라가지 않습니다(.gitignore).
+  </p>
+  <div class="bar">
+    <select id="days"><option value="30">최근 30일</option><option value="90" selected>최근 90일</option><option value="180">최근 180일</option></select>
+    <label><input type="checkbox" id="onlyFound" checked /> 뭔가 뽑힌 글 + 준비물 낱말이 있는 글만</label>
+    <button id="load">불러오기</button>
+    <button id="export" disabled>정답 파일 받기</button>
+    <span id="status" class="note"></span>
+  </div>
+  <div id="list"></div>
+  <script type="module" src="prep-eval.js"></script>
+</body>
+</html>

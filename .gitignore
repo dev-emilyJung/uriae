@@ -4,3 +4,4 @@ node_modules/
 Thumbs.db
 site/admin-data.json
 site/admin-full.html
+tests/private/
