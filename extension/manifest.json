@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "우리애 한눈에",
   "short_name": "우리애 한눈에",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "준비물은 한눈에, 우리 아이 사진만 골라서 한 번에. 아이 사진·정보는 어디로도 보내지 않아요. 키즈노트 웹과 함께 쓰는 비공식 도구.",
   "homepage_url": "https://uriae.emilysoft.com",
   "icons": {
