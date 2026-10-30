@@ -9,6 +9,7 @@ import { Human } from '../vendor/human.esm.js';
 
 export const MODEL_ID = 'insightface-swish-aligned-v1';
 const MIN_FACE_PX = 36; // 이보다 작은 얼굴은 특징값이 너무 부정확해서 제외
+const MIN_FACE_SCORE = 0.6; // 얼굴 윤곽 확신도. 이보다 낮으면 손·물건을 얼굴로 잘못 찾은 경우가 많아서 제외
 
 const config = {
   modelBasePath: chrome.runtime.getURL('vendor/models/'),
@@ -143,7 +144,9 @@ export async function detectFaces(src, { withCrops = false } = {}) {
     if (!f.mesh || f.mesh.length < 300) continue;
     const size = Math.min(f.box[2], f.box[3]);
     if (size < MIN_FACE_PX) continue;
+    if ((f.faceScore ?? 1) < MIN_FACE_SCORE) continue;
     faces.push({
+      score: f.faceScore ?? 1,
       box: f.box,
       nbox: [f.box[0] / canvas.width, f.box[1] / canvas.height, f.box[2] / canvas.width, f.box[3] / canvas.height], // 사진 크기 대비 비율
       size,

@@ -309,7 +309,7 @@ const fbOf = (child) => {
 
 /** 한 아이의 앨범 사진을 판정. 얼굴 특징값은 faceMem(메모리)에서 가져온다 */
 function classifyKid(kid, mine, reports, strictness) {
-  const { refsFor, cohortStats, sampleCohort, decide, judge, pickAutoRefs, SURE_MIN_PX } = matchLib;
+  const { refsFor, cohortStats, sampleCohort, decide, judge, pickAutoRefs, SURE_MIN_PX, SURE_MIN_SCORE } = matchLib;
   const th = decide(strictness);
   const fb = fbOf(kid.child);
   const allEmbs = mine.flatMap((j) => (faceMem.get(j.img.id) || []).map((f) => f.emb));
@@ -329,7 +329,7 @@ function classifyKid(kid, mine, reports, strictness) {
       faces.forEach((f, i) => {
         if (!f.stat) f.stat = cohortStats(f.emb, cohort);
         const r = judge(f.emb, f.stat, refs, neg, th);
-        if (r.level === 3 && f.size < SURE_MIN_PX) r.level = 1;
+        if (r.level === 3 && (f.size < SURE_MIN_PX || (f.score ?? 1) < SURE_MIN_SCORE)) r.level = 1;
         if (r.level > best.level || (r.level === best.level && r.z > best.z)) best = { ...r, idx: i };
       });
       // 사용자가 직접 고친 사진은 그대로 따른다
@@ -446,7 +446,7 @@ async function runSearch(days, kids, ui) {
       pending.delete(i);
       let faces = [];
       if (blob) {
-        try { faces = (await detectFaces(blob)).map((f) => ({ emb: f.emb, size: f.size, box: f.nbox })); } catch { faces = []; }
+        try { faces = (await detectFaces(blob)).map((f) => ({ emb: f.emb, size: f.size, score: f.score, box: f.nbox })); } catch { faces = []; }
       }
       faceMem.set(todo[i].img.id, faces);
       done++;

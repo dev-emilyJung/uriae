@@ -90,6 +90,8 @@ export function judge(emb, faceStat, refs, neg, th) {
 
 /** 이보다 작은 얼굴(px)은 특징값이 흔들려서 "우리 아이"로 확정하지 않고 "확인 필요"로 둔다 */
 export const SURE_MIN_PX = 48;
+/** 얼굴 윤곽 확신도가 이보다 낮으면(손·옆모습·가려진 얼굴 등) "우리 아이"로 확정하지 않는다 */
+export const SURE_MIN_SCORE = 0.8;
 
 /**
  * 1차 판정에서 아주 확실한 얼굴을 기준 얼굴로 추가 (같은 시기의 우리 아이 얼굴이라 다음 판정에 가장 도움이 된다).
