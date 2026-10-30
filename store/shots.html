@@ -1,0 +1,341 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<title>스토어 이미지</title>
+<!-- 크롬 웹스토어 캡처화면(1280×800)과 작은 홍보 타일(440×280).
+     실제 아이 사진 대신 그림을 쓴다. 만들기: node store/render.mjs -->
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@700&display=block" rel="stylesheet" />
+<link rel="stylesheet" href="../extension/app.css" />
+<style>
+  html, body { margin: 0; min-height: 0; }
+  body { display: block; background: #eef1f5; }
+  .shot { width: 1280px; height: 800px; position: relative; overflow: hidden; display: none; background: #eef1f5; color: #1e2125; }
+  .shot.on { display: block; }
+  .cap { position: absolute; left: 64px; top: 0; bottom: 0; width: 360px; display: flex; flex-direction: column; justify-content: center; }
+  .cap .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 16px; color: #6a7078; margin-bottom: 28px; }
+  .cap .brand img { width: 32px; height: 32px; border-radius: 8px; }
+  .cap h2 { font: 700 44px/1.3 "Gowun Batang", serif; margin: 0 0 20px; letter-spacing: -0.02em; }
+  .cap p { font-size: 19px; line-height: 1.7; color: #4b5158; margin: 0; }
+  .cap mark { padding: 0 2px; }
+  .win {
+    position: absolute; left: 456px; top: 56px; width: 776px; height: 744px; background: #fff;
+    border-radius: 12px 12px 0 0; box-shadow: 0 20px 60px rgba(30, 40, 60, 0.18), 0 2px 6px rgba(30, 40, 60, 0.08); overflow: hidden;
+  }
+  .win .bar { height: 36px; background: #f1f3f6; display: flex; align-items: center; gap: 7px; padding: 0 14px; border-bottom: 1px solid #e3e5e8; }
+  .win .bar i { width: 11px; height: 11px; border-radius: 50%; background: #d5d9df; }
+  .win .bar span { margin-left: 14px; font-size: 12px; color: #6a7078; background: #fff; border-radius: 99px; padding: 2px 14px; }
+  .win .app { height: calc(100% - 36px); overflow: hidden; display: flex; flex-direction: column; }
+  .win .top, .win .context, .win .tabs, .win main { max-width: none; }
+  .win main { padding-top: 18px; }
+  .win .foot { display: none; }
+  .grid { grid-template-columns: repeat(6, 1fr); }
+  .tile svg { width: 100%; height: 100%; display: block; }
+  .tile:not(.sel) svg { opacity: 0.45; }
+  .tile.maybe .tag { display: block; position: absolute; left: 4px; bottom: 4px; font-size: 11px; background: rgba(0,0,0,.55); color: #fff; padding: 0 6px; border-radius: 3px; }
+  .dock { position: absolute; left: 24px; right: 24px; bottom: 0; }
+  /* 크게 보기는 창 안에 */
+  .win .viewer { position: absolute; top: 36px; }
+  .vw-frame svg { display: block; width: 470px; height: auto; }
+  .vw-zoom { width: 170px; }
+  .vw-zoom svg { display: block; width: 170px; height: 170px; border-radius: 4px; outline: 3px solid #ffd43b; margin-bottom: 8px; }
+  .vw-main { grid-template-columns: 36px 1fr auto 36px; }
+  .vw-bottom .btn { min-width: 130px; }
+  .ref svg { width: 100%; height: 100%; display: block; }
+  /* 개인정보 */
+  .privacy { place-items: center; text-align: center; background: #fff; }
+  .privacy.on { display: grid; }
+  .privacy .in { width: 1000px; }
+  .privacy .brand { justify-content: center; display: flex; align-items: center; gap: 10px; font-weight: 700; color: #6a7078; margin-bottom: 26px; }
+  .privacy .brand img { width: 36px; height: 36px; border-radius: 8px; }
+  .privacy h2 { font: 700 52px/1.3 "Gowun Batang", serif; margin: 0 0 18px; letter-spacing: -0.02em; }
+  .privacy .lead { font-size: 21px; color: #4b5158; margin: 0 0 54px; }
+  .flow { display: flex; align-items: center; justify-content: center; gap: 18px; margin-bottom: 56px; }
+  .flow .box { border: 1.5px solid #1e2125; border-radius: 10px; padding: 18px 26px; font-size: 18px; font-weight: 700; background: #fff; min-width: 190px; }
+  .flow .box small { display: block; font-weight: 400; font-size: 14px; color: #6a7078; margin-top: 4px; }
+  .flow .box.me { background: #1e2125; color: #fff; }
+  .flow .box.me small { color: #c3c7cd; }
+  .flow .arr { font-size: 26px; color: #9aa0a8; }
+  .flow .box.no { border-style: dashed; border-color: #b3261e; color: #b3261e; position: relative; }
+  .flow .box.no small { color: #b3261e; }
+  .points { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0; border-top: 1px solid #1e2125; }
+  .points div { padding: 20px 16px 0; font-size: 17px; font-weight: 700; text-align: left; border-right: 1px solid #e3e5e8; }
+  .points div:last-child { border-right: 0; }
+  .points small { display: block; font-weight: 400; color: #6a7078; font-size: 14px; margin-top: 6px; line-height: 1.6; }
+  /* 작은 홍보 타일 */
+  .tileimg { width: 440px; height: 280px; background: #fff; position: relative; overflow: hidden; display: none; }
+  .tileimg.on { display: block; position: fixed; left: 0; top: 0; }
+  .tileimg .in { position: absolute; left: 32px; top: 0; bottom: 0; width: 240px; display: flex; flex-direction: column; justify-content: center; }
+  .tileimg img { width: 56px; height: 56px; border-radius: 12px; margin-bottom: 16px; }
+  .tileimg h3 { font: 700 30px/1.25 "Gowun Batang", serif; margin: 0 0 10px; }
+  .tileimg p { margin: 0; font-size: 15px; line-height: 1.6; color: #4b5158; }
+  .tileimg .pics { position: absolute; right: -10px; top: 26px; display: grid; grid-template-columns: repeat(2, 76px); gap: 6px; transform: rotate(4deg); }
+  .tileimg .pics svg { width: 76px; height: 76px; display: block; border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<!-- 1. 챙길 것 -->
+<section class="shot" id="s1">
+  <div class="cap">
+    <div class="brand"><img src="../extension/icons/icon128.png" alt="" />우리애 한눈에</div>
+    <h2>긴 알림장에서<br />준비물만 쏙</h2>
+    <p>알림장과 공지에서 준비물·복장·마감을 뽑아 <mark>오늘·내일·이번 주</mark>로 나눠 체크리스트로 보여줘요. 원문도 바로 확인할 수 있어요.</p>
+  </div>
+  <div class="win"><div class="bar"><i></i><i></i><i></i><span>우리애 한눈에</span></div>
+    <div class="app">
+      <header class="top"><div class="brand"><img src="../extension/icons/icon48.png" alt="" width="24" height="24" /><span>우리애 한눈에</span></div></header>
+      <div class="context"><h1>김하늘</h1>
+        <div class="classes"><label><input type="checkbox" checked />햇살반</label><label><input type="checkbox" checked />방과후 미술반</label></div></div>
+      <nav class="tabs"><button aria-selected="true">챙길 것</button><button>우리 애 사진</button><button>기준 얼굴</button></nav>
+      <main>
+        <p class="summary">내일 챙길 것 3가지</p>
+        <p class="muted">최근 30일 알림장·공지 14개에서 찾았어요</p>
+        <div class="group-title">내일 <small>10월 28일 수요일</small></div>
+        <div class="card">
+          <div class="card-head"><span class="dday">D-1</span><span class="date">10/28 수</span><span class="badge">알림장</span><span class="who">햇살반</span></div>
+          <h3>과학관 현장학습</h3>
+          <p class="event">9시 30분까지 등원</p>
+          <ul class="items">
+            <li class="checked"><input type="checkbox" checked /><span>원복</span></li>
+            <li><input type="checkbox" /><span>편한 운동화</span></li>
+            <li><input type="checkbox" /><span>끈 있는 물통 (물은 반만)</span></li>
+          </ul>
+        </div>
+        <div class="group-title">이번 주</div>
+        <div class="card">
+          <div class="card-head"><span class="dday">D-3</span><span class="date">10/30 금</span><span class="badge">공지</span><span class="who">햇살반</span></div>
+          <h3>할로윈 파티</h3>
+          <ul class="items">
+            <li><input type="checkbox" /><span>할로윈 의상 (머리띠·망토 등 간단히)</span></li>
+            <li><input type="checkbox" /><span>사탕 바구니</span></li>
+          </ul>
+        </div>
+        <div class="card">
+          <div class="card-head"><span class="dday">D-4</span><span class="date">10/31 토</span><span class="badge">공지</span><span class="who">방과후 미술반</span></div>
+          <h3>참여수업 신청서 마감</h3>
+          <ul class="items"><li><input type="checkbox" /><span>신청서 제출</span></li></ul>
+        </div>
+      </main>
+    </div>
+  </div>
+</section>
+
+<!-- 2. 우리 아이 사진 -->
+<section class="shot" id="s2">
+  <div class="cap">
+    <div class="brand"><img src="../extension/icons/icon128.png" alt="" />우리애 한눈에</div>
+    <h2>수천 장 앨범에서<br />우리 아이 사진만</h2>
+    <p>앨범과 알림장 사진에서 우리 아이가 나온 사진만 골라요. <mark>단체사진도 포함</mark>되고, 하나씩 누를 필요 없이 ZIP 파일 하나로 받아요.</p>
+  </div>
+  <div class="win"><div class="bar"><i></i><i></i><i></i><span>우리애 한눈에</span></div>
+    <div class="app">
+      <header class="top"><div class="brand"><img src="../extension/icons/icon48.png" alt="" width="24" height="24" /><span>우리애 한눈에</span></div></header>
+      <div class="context"><h1>김하늘</h1></div>
+      <nav class="tabs"><button>챙길 것</button><button aria-selected="true">우리 애 사진</button><button>기준 얼굴</button></nav>
+      <main style="position:relative">
+        <p class="muted" style="margin:0">하늘: 앨범 455장 중 34장, 확인 필요 12장, 알림장 3장</p>
+        <div class="section-label">우리 아이<small>34장 · 사진을 누르면 크게 보여요</small><button class="linkbtn">하나씩 크게 보기</button></div>
+        <div class="grid" id="g-sure"></div>
+        <div class="section-label">확인이 필요해요<small>12장 · 크게 보며 Y/N으로 골라요</small><button class="linkbtn">하나씩 크게 보기</button></div>
+        <div class="grid" id="g-maybe"></div>
+        <div class="dock"><span>선택 37장</span><div class="dock-actions"><button class="btn">ZIP으로 받기</button></div></div>
+      </main>
+    </div>
+  </div>
+</section>
+
+<!-- 3. 크게 보기 -->
+<section class="shot" id="s3">
+  <div class="cap">
+    <div class="brand"><img src="../extension/icons/icon128.png" alt="" />우리애 한눈에</div>
+    <h2>단체사진도<br />크게 보며 확인</h2>
+    <p>어느 얼굴을 우리 아이로 봤는지 <mark>노란 네모</mark>로 보여줘요. 키보드 Y·N으로 빠르게 고르면, 고친 내용을 배워서 다시 찾아줘요.</p>
+  </div>
+  <div class="win"><div class="bar"><i></i><i></i><i></i><span>우리애 한눈에</span></div>
+    <div class="viewer">
+      <div class="vw-top"><div class="vw-info">확인이 필요해요 3/12 · 2026-10-21 가을 소풍</div><span class="vw-state">고르지 않은 사진</span><button class="vw-close">✕</button></div>
+      <div class="vw-main">
+        <button class="vw-nav">‹</button>
+        <div class="vw-stage"><div class="vw-frame" id="v-frame"></div></div>
+        <div class="vw-zoom" id="v-zoom"></div>
+        <button class="vw-nav">›</button>
+      </div>
+      <div class="vw-bottom"><button class="btn ghost">아니에요 <kbd>N</kbd></button><button class="btn">맞아요 <kbd>Y</kbd></button>
+        <div class="vw-hint">답하면 다음 사진으로 넘어가요 · 노란 네모가 다른 아이면 우리 아이 얼굴을 눌러 주세요</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- 4. 기준 얼굴 -->
+<section class="shot" id="s4">
+  <div class="cap">
+    <div class="brand"><img src="../extension/icons/icon128.png" alt="" />우리애 한눈에</div>
+    <h2>자라는 얼굴에 맞춰<br />6개월마다</h2>
+    <p>아이 얼굴은 금방 바뀌어서 시기별로 기준 얼굴을 등록해요. 그 시기 키즈노트 사진 속 얼굴을 <mark>눌러서 고르기만</mark> 하면 돼요.</p>
+  </div>
+  <div class="win"><div class="bar"><i></i><i></i><i></i><span>우리애 한눈에</span></div>
+    <div class="app">
+      <header class="top"><div class="brand"><img src="../extension/icons/icon48.png" alt="" width="24" height="24" /><span>우리애 한눈에</span></div></header>
+      <div class="context"><h1>김하늘</h1></div>
+      <nav class="tabs"><button>챙길 것</button><button>우리 애 사진</button><button aria-selected="true">기준 얼굴</button></nav>
+      <main>
+        <section class="panel">
+          <h2>기간별 기준 얼굴</h2>
+          <p class="muted">사진 날짜와 가까운 시기의 얼굴로 비교해요. 기간마다 2개 이상 골라 주세요.</p>
+          <div class="periods" id="periods"></div>
+        </section>
+        <section class="panel">
+          <h2>찾는 기준</h2>
+          <div class="slider"><span class="muted">많이 찾기</span><input type="range" min="0" max="1" step="0.1" value="0.5" /><span class="muted">정확하게</span></div>
+          <p class="muted">다른 아이가 섞이면 정확하게 쪽으로, 놓치는 사진이 많으면 많이 찾기 쪽으로 옮겨 보세요.</p>
+        </section>
+      </main>
+    </div>
+  </div>
+</section>
+
+<!-- 5. 개인정보 -->
+<section class="shot privacy" id="s5">
+  <div class="in">
+    <div class="brand"><img src="../extension/icons/icon128.png" alt="" />우리애 한눈에</div>
+    <h2>우리 아이 사진과 정보는<br />어디로도 보내지 않아요</h2>
+    <p class="lead">얼굴 비교까지 모든 작업이 지금 이 컴퓨터 안에서만 끝나요.</p>
+    <div class="flow">
+      <div class="box">키즈노트 웹<small>평소처럼 로그인</small></div>
+      <div class="arr">→</div>
+      <div class="box me">내 컴퓨터 브라우저<small>준비물 정리 · 얼굴 비교</small></div>
+      <div class="arr">→</div>
+      <div class="box">ZIP 파일<small>내 다운로드 폴더</small></div>
+      <div class="arr">✕</div>
+      <div class="box no">외부 서버<small>없음</small></div>
+    </div>
+    <div class="points">
+      <div>서버가 없어요<small>사진을 받는 서버 자체가 없어요.</small></div>
+      <div>회원가입이 없어요<small>설치하고 바로 써요.</small></div>
+      <div>비밀번호를 묻지 않아요<small>로그인된 키즈노트 웹을 그대로 써요.</small></div>
+      <div>친구 얼굴은 저장 안 해요<small>비교에만 쓰고, 탭을 닫으면 사라져요.</small></div>
+    </div>
+  </div>
+</section>
+
+<!-- 작은 홍보 타일 440×280 -->
+<section class="tileimg" id="t1">
+  <div class="in">
+    <img src="../extension/icons/icon128.png" alt="" />
+    <h3>우리애 한눈에</h3>
+    <p>준비물은 한눈에,<br />우리 아이 사진만 골라서 한 번에</p>
+  </div>
+  <div class="pics" id="t-pics"></div>
+</section>
+
+<script>
+// ── 그림 아이 ── (실제 아이 사진 대신)
+const SKIN = ['#f6d3b8', '#f1c6a4', '#f8dcc6', '#eab896'];
+const HAIR = ['#2b2420', '#3d2c22', '#1c1a1a', '#5a3b28'];
+const SHIRT = ['#3f8f5a', '#e2735a', '#f2c14e', '#5b8fd8', '#b07cc6', '#ef9fb6', '#5fb5ad', '#8a8f98'];
+// 우리 아이(하늘): 짧은 머리, 초록 티셔츠, 노란 모자 없음
+const ME = { skin: '#f6d3b8', hair: '#1f1b19', shirt: '#3f8f5a', style: 'short' };
+
+function kid(cx, cy, r, k) {
+  // cx, cy: 얼굴 중심, r: 얼굴 반지름
+  const { skin, hair, shirt, style } = k;
+  const body = `<path d="M${cx - r * 1.25} ${cy + r * 3.2} Q${cx - r * 1.2} ${cy + r * 1.1} ${cx} ${cy + r * 1.05} Q${cx + r * 1.2} ${cy + r * 1.1} ${cx + r * 1.25} ${cy + r * 3.2} Z" fill="${shirt}"/>`;
+  let back = '', front = '';
+  if (style === 'long') {
+    back = `<path d="M${cx - r * 1.08} ${cy} Q${cx - r * 1.15} ${cy + r * 1.5} ${cx - r * 0.6} ${cy + r * 1.55} L${cx + r * 0.6} ${cy + r * 1.55} Q${cx + r * 1.15} ${cy + r * 1.5} ${cx + r * 1.08} ${cy} Z" fill="${hair}"/>`;
+  }
+  if (style === 'pig') {
+    back = `<circle cx="${cx - r * 1.15}" cy="${cy - r * 0.2}" r="${r * 0.42}" fill="${hair}"/><circle cx="${cx + r * 1.15}" cy="${cy - r * 0.2}" r="${r * 0.42}" fill="${hair}"/>`;
+  }
+  const face = `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${skin}"/>`;
+  front = `<path d="M${cx - r * 1.02} ${cy - r * 0.05} Q${cx - r * 1.05} ${cy - r * 1.12} ${cx} ${cy - r * 1.1} Q${cx + r * 1.05} ${cy - r * 1.12} ${cx + r * 1.02} ${cy - r * 0.05} Q${cx + r * 0.5} ${cy - r * (style === 'short' ? 0.55 : 0.4)} ${cx} ${cy - r * 0.62} Q${cx - r * 0.5} ${cy - r * 0.45} ${cx - r * 1.02} ${cy - r * 0.05} Z" fill="${hair}"/>`;
+  if (k.hat) front += `<path d="M${cx - r * 1.25} ${cy - r * 0.55} Q${cx} ${cy - r * 0.85} ${cx + r * 1.25} ${cy - r * 0.55} L${cx + r * 0.9} ${cy - r * 0.75} Q${cx} ${cy - r * 1.75} ${cx - r * 0.9} ${cy - r * 0.75} Z" fill="${k.hat}"/>`;
+  const eyes = `<circle cx="${cx - r * 0.36}" cy="${cy + r * 0.08}" r="${r * 0.1}" fill="#2a2522"/><circle cx="${cx + r * 0.36}" cy="${cy + r * 0.08}" r="${r * 0.1}" fill="#2a2522"/>`;
+  const cheeks = `<circle cx="${cx - r * 0.55}" cy="${cy + r * 0.38}" r="${r * 0.14}" fill="#f29a8c" opacity=".55"/><circle cx="${cx + r * 0.55}" cy="${cy + r * 0.38}" r="${r * 0.14}" fill="#f29a8c" opacity=".55"/>`;
+  const mouth = `<path d="M${cx - r * 0.22} ${cy + r * 0.42} Q${cx} ${cy + r * 0.62} ${cx + r * 0.22} ${cy + r * 0.42}" stroke="#a0473a" stroke-width="${r * 0.08}" fill="none" stroke-linecap="round"/>`;
+  return back + body + face + front + eyes + cheeks + mouth;
+}
+const other = (i) => ({ skin: SKIN[i % 4], hair: HAIR[(i + 1) % 4], shirt: SHIRT[(i + 1) % 8], style: ['long', 'pig', 'short', 'bob'][i % 4] });
+
+const SCENES = {
+  room: `<rect width="200" height="200" fill="#f3e9d8"/><rect y="130" width="200" height="70" fill="#d9c2a0"/><rect x="18" y="26" width="58" height="42" rx="3" fill="#bfe0f2"/><rect x="128" y="20" width="50" height="62" rx="3" fill="#f7c9c9"/>`,
+  park: `<rect width="200" height="200" fill="#bfe3f5"/><circle cx="168" cy="34" r="14" fill="#fff1a8"/><rect y="128" width="200" height="72" fill="#9ccc7a"/><circle cx="30" cy="118" r="26" fill="#6faf5a"/><circle cx="182" cy="112" r="30" fill="#7dbb63"/>`,
+  autumn: `<rect width="200" height="200" fill="#f7e3b0"/><rect y="132" width="200" height="68" fill="#c9b07a"/><circle cx="40" cy="70" r="40" fill="#f0b43c"/><circle cx="170" cy="60" r="44" fill="#e9922f"/>`,
+  stage: `<rect width="200" height="200" fill="#9a9c9f"/><rect y="146" width="200" height="54" fill="#c7a77f"/><rect width="200" height="22" fill="#7a2e3a"/>`,
+  sea: `<rect width="200" height="200" fill="#cdeefa"/><rect y="104" width="200" height="40" fill="#7cc6e6"/><rect y="144" width="200" height="56" fill="#f2deb0"/>`,
+};
+function photo(scene, kids, w = 200, h = 200) {
+  return `<svg viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid slice">${SCENES[scene]}${kids.join('')}</svg>`;
+}
+// 사진 모음: [장면, [[cx, cy, r, 우리 아이 여부|다른 아이 번호]...]]
+const PHOTOS = [
+  ['room', [[100, 92, 30, 'me']]],
+  ['park', [[70, 100, 22, 'me'], [138, 104, 21, 3]]],
+  ['autumn', [[100, 96, 28, 'me']]],
+  ['stage', [[40, 104, 14, 1], [80, 100, 14, 'me'], [120, 104, 14, 2], [160, 100, 14, 5]]],
+  ['sea', [[100, 90, 30, 'me']]],
+  ['room', [[60, 100, 18, 4], [104, 96, 19, 'me'], [150, 100, 18, 6]]],
+  ['park', [[100, 98, 26, 'me', '#f4e2a6']]],
+  ['autumn', [[76, 98, 22, 2], [128, 96, 23, 'me']]],
+  ['room', [[100, 92, 30, 'me']]],
+  ['stage', [[60, 102, 16, 'me'], [104, 104, 16, 7], [148, 102, 16, 0]]],
+  ['park', [[100, 98, 26, 'me']]],
+  ['sea', [[70, 98, 22, 'me'], [132, 96, 22, 1]]],
+];
+const MAYBE = [
+  ['park', [[40, 112, 11, 0], [72, 110, 11, 1], [104, 112, 11, 'me'], [136, 110, 11, 2], [168, 112, 11, 3]]],
+  ['room', [[100, 98, 26, 5]]],
+  ['stage', [[50, 106, 13, 6], [100, 104, 13, 'me'], [150, 106, 13, 7]]],
+  ['autumn', [[100, 94, 28, 'me', '#e7e2d8']]],
+  ['room', [[64, 100, 20, 2], [134, 100, 20, 4]]],
+  ['park', [[100, 100, 24, 'me']]],
+];
+const draw = ([scene, ks]) => photo(scene, ks.map(([x, y, r, who, hat]) => kid(x, y, r, who === 'me' ? { ...ME, hat } : other(who))));
+
+function tile(svg, sel, maybe) {
+  return `<button class="tile${sel ? ' sel' : ''}${maybe ? ' maybe' : ''}">${svg}${maybe ? '<span class="tag">확인</span>' : ''}<span class="check">✓</span></button>`;
+}
+document.getElementById('g-sure').innerHTML = PHOTOS.map((p, i) => tile(draw(p), i !== 7, false)).join('');
+document.getElementById('g-maybe').innerHTML = MAYBE.map((p, i) => tile(draw(p), i === 0 || i === 3, true)).join('');
+
+// 크게 보기: 단체사진 + 노란 네모 + 확대
+{
+  const W = 600, H = 400;
+  const scene = `<rect width="${W}" height="${H}" fill="#f7e3b0"/><circle cx="90" cy="120" r="90" fill="#f0b43c"/><circle cx="520" cy="110" r="100" fill="#e9922f"/><rect y="250" width="${W}" height="150" fill="#c9b07a"/>`;
+  const people = [[90, 200, 30, 0], [190, 196, 31, 1], [300, 202, 31, 'me'], [410, 196, 30, 2], [510, 200, 30, 3]];
+  const kidsSvg = people.map(([x, y, r, who]) => kid(x, y, r, who === 'me' ? ME : other(who))).join('');
+  const boxes = people.map(([x, y, r, who]) => {
+    const pad = r * 1.15;
+    return `<div class="vw-face${who === 'me' ? ' me' : ''}" style="left:${((x - pad) / W) * 100}%;top:${((y - pad) / H) * 100}%;width:${((2 * pad) / W) * 100}%;height:${((2 * pad) / H) * 100}%"></div>`;
+  }).join('');
+  document.getElementById('v-frame').innerHTML = `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">${scene}${kidsSvg}</svg>${boxes}`;
+  document.getElementById('v-zoom').innerHTML = `<svg viewBox="${300 - 58} ${202 - 58} 116 116" xmlns="http://www.w3.org/2000/svg">${scene}${kidsSvg}</svg>우리 아이로 본 얼굴`;
+}
+
+// 기준 얼굴 기간
+{
+  const face = (hair, skin, shirt, i) => `<div class="ref">${photo(['room', 'park', 'autumn', 'sea'][i % 4], [kid(100, 104, 56, { skin, hair, shirt, style: 'short' })])}</div>`;
+  const rows = [
+    ['만 5세 후반', '2026.07.15 ~ 2026.10.30', 3],
+    ['만 5세 전반', '2026.01.15 ~ 2026.07.14', 2],
+    ['만 4세 후반', '2025.07.15 ~ 2026.01.14', 2],
+    ['만 4세 전반', '2025.01.15 ~ 2025.07.14', 0],
+  ];
+  document.getElementById('periods').innerHTML = rows.map(([label, range, n]) => `
+    <div class="period${n < 2 ? ' need' : ''}">
+      <div class="period-head"><b>${label}</b><span class="muted">${range}</span><span class="count">${n < 2 ? '등록 필요' : `${n}개 등록`}</span></div>
+      <div class="refs">${Array.from({ length: n }, (_, i) => face(ME.hair, ME.skin, SHIRT[(i * 3) % 8], i)).join('')}</div>
+      <button class="btn small${n < 2 ? '' : ' ghost'}">${n < 2 ? '얼굴 고르기' : '더 고르기'}</button>
+    </div>`).join('');
+}
+
+document.getElementById('t-pics').innerHTML = [PHOTOS[0], PHOTOS[3], PHOTOS[1], PHOTOS[6]].map(draw).join('');
+
+// #s1 ~ #s5, #t1 만 보이게 (캡처용)
+const id = location.hash.slice(1) || 's1';
+document.getElementById(id).classList.add('on');
+</script>
+</body>
+</html>
