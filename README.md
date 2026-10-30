@@ -11,7 +11,7 @@
 
 <p align="center">
   <a href="https://uriae.emilysoft.com">uriae.emilysoft.com</a> ·
-  <a href="#후원">☕ 후원하기</a> ·
+  <a href="#응원하기">⭐ 응원하기</a> ·
   <a href="#설치">설치</a>
 </p>
 
@@ -97,11 +97,11 @@ extension/
 이슈와 PR 환영합니다. 특히 **준비물 추출이 실패한 문장 예시**(개인정보를 지운)가 큰 도움이 됩니다.
 PR을 보내주시면 기여자 라이선스 동의(CLA)를 요청드립니다.
 
-## 후원
+## 응원하기
 
-이 도구는 **모든 기능이 무료**입니다. 도움이 되셨다면 커피 한 잔으로 응원해 주세요. ☕
+이 도구는 **모든 기능이 무료**입니다. 도움이 되셨다면 이 저장소에 ⭐ 별을 눌러 주시거나, 주변 부모님들께 알려 주세요.
 
-- 후원 안내: https://uriae.emilysoft.com/#support
+- 홈페이지: https://uriae.emilysoft.com
 
 ## 고지
 

@@ -23,7 +23,7 @@
         <a href="#what">하는 일</a>
         <a href="#how">설치</a>
         <a href="#faq">자주 묻는 질문</a>
-        <a href="#support">후원</a>
+        <a href="#support">응원</a>
       </nav>
     </header>
 
@@ -125,9 +125,27 @@
 
     <section class="part col support" id="support">
       <h2>응원하기</h2>
-      <p>도움이 되셨다면 GitHub에 별을 눌러 주세요. 별이 많을수록 다른 부모님들이 찾기 쉬워집니다.</p>
-      <a class="btn" href="https://github.com/dev-emilyJung/uriae">GitHub에서 별 누르기</a>
+      <p>도움이 되셨다면 같은 반 부모님들께 알려 주세요. 크롬 웹스토어에 별점과 한 줄 후기를 남겨 주시면 다른 부모님들이 찾기 쉬워집니다.</p>
+      <div class="actions">
+        <button class="btn" id="share" type="button">링크 공유하기</button>
+        <a class="btn ghost" aria-disabled="true">웹스토어 후기 남기기 (준비 중)</a>
+      </div>
+      <p class="dev">개발자라면 <a href="https://github.com/dev-emilyJung/uriae">GitHub에서 별</a>을 눌러 주셔도 큰 힘이 됩니다.</p>
     </section>
+    <script>
+      // 휴대폰은 공유 창(카카오톡 등), PC는 링크 복사
+      document.getElementById('share').addEventListener('click', async (e) => {
+        const btn = e.currentTarget;
+        const data = { title: '우리애 한눈에', text: '키즈노트 준비물은 한눈에, 우리 아이 사진만 골라서 한 번에', url: 'https://uriae.emilysoft.com' };
+        try {
+          if (navigator.share) return await navigator.share(data);
+          await navigator.clipboard.writeText(`${data.text}\n${data.url}`);
+          btn.textContent = '링크를 복사했어요';
+        } catch (err) {
+          if (err.name !== 'AbortError') btn.textContent = 'uriae.emilysoft.com';
+        }
+      });
+    </script>
 
     <footer class="foot">
       <div class="row">

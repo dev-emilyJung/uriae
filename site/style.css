@@ -93,6 +93,11 @@ ol.how li::marker { font-family: var(--serif); font-weight: 700; }
 .faq details[open] summary::after { content: "−"; }
 .faq details p { margin: 10px 0 0; color: var(--soft); }
 .support p { color: var(--soft); max-width: 34em; }
+.support .actions { margin: 24px 0 18px; }
+.support .dev { font-size: 14px; }
+button.btn { border: 0; cursor: pointer; font-family: inherit; line-height: inherit; }
+.btn.ghost { background: transparent; color: var(--ink); box-shadow: inset 0 0 0 1px var(--rule); }
+.btn.ghost[aria-disabled="true"] { background: transparent; color: var(--soft); }
 
 footer.foot { margin-top: 80px; border-top: 1px solid var(--rule); padding: 28px 0 48px; color: var(--soft); font-size: 14px; }
 footer.foot .row { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px 24px; margin-bottom: 10px; }
