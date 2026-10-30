@@ -801,13 +801,17 @@ function drawResults(container) {
     const nextBtn = h('button', { class: 'vw-nav', 'aria-label': '다음 사진', title: '다음 (→)' }, '›');
     const stage = h('div', { class: 'vw-stage' });
     const zoom = h('div', { class: 'vw-zoom' });
-    const noBtn = h('button', { class: 'btn ghost' }, '아니에요 ', h('kbd', {}, 'N'));
-    const yesBtn = h('button', { class: 'btn' }, '맞아요 ', h('kbd', {}, 'Y'));
+    const count = h('span', { class: 'vw-count' });
+    const noBtn = h('button', { class: 'btn ghost vw-answer' }, h('kbd', {}, 'N'), '아니에요');
+    const yesBtn = h('button', { class: 'btn vw-answer' }, h('kbd', {}, 'Y'), '맞아요');
+    const key = (k, label) => h('span', { class: 'vw-key' }, h('kbd', {}, k), label);
     const view = h('div', { class: 'viewer', role: 'dialog', 'aria-modal': 'true' },
-      h('div', { class: 'vw-top' }, info, state, closeBtn),
+      h('div', { class: 'vw-top' }, count, info, state, closeBtn),
       h('div', { class: 'vw-main' }, prevBtn, stage, zoom, nextBtn),
       h('div', { class: 'vw-bottom' }, noBtn, yesBtn,
-        h('div', { class: 'vw-hint' }, '답하면 다음 사진으로 넘어가요 · 노란 네모가 다른 아이면 우리 아이 얼굴을 눌러 주세요 · ← → 이동 · Esc 닫기')),
+        // 키보드로 빠르게: 크게 보여서 처음 보는 사람도 알 수 있게
+        h('div', { class: 'vw-keys' }, key('Y', '맞아요'), key('N', '아니에요'), h('span', { class: 'vw-key' }, h('kbd', {}, '←'), h('kbd', {}, '→'), '넘기기'), key('Esc', '닫기')),
+        h('div', { class: 'vw-hint' }, '답하면 다음 사진으로 넘어가요. 노란 네모가 다른 아이면 사진 속 우리 아이 얼굴을 눌러 주세요.')),
     );
 
     const show = () => {
@@ -815,7 +819,8 @@ function drawResults(container) {
       const key = `${g.child}:${x.img.id}`;
       const faces = faceMem.get(x.img.id) || [];
       const on = s.selected.has(key);
-      info.textContent = `${SECTION[kind]} ${i + 1}/${items.length} · ${x.date} ${x.title}`;
+      count.textContent = `${i + 1} / ${items.length}`;
+      info.textContent = `${SECTION[kind]} · ${x.date} ${x.title}`;
       state.textContent = on ? '✓ 고른 사진' : '고르지 않은 사진';
       state.classList.toggle('on', on);
       const img = h('img', { src: x.img.large || x.img.original, alt: '' });
