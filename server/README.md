@@ -57,8 +57,11 @@ sudo cp server/uriae-feedback.service /etc/systemd/system/
 sudo systemctl daemon-reload && sudo systemctl enable --now uriae-feedback
 # nginx 연결: 연속 제출 제한 영역 + 사이트 설정에 include 한 줄 (certbot 이 고친 설정은 그대로 두고 한 줄만 넣는다)
 sudo cp server/nginx-feedback-zone.conf /etc/nginx/conf.d/uriae-feedback-zone.conf
-grep -q nginx-feedback.conf /etc/nginx/sites-available/uriae || \
-  sudo sed -i 's|^\(\s*\)root /var/www/uriae;|&\n\1include /opt/uriae/server/nginx-feedback.conf;|' /etc/nginx/sites-available/uriae
+# 사이트 설정 파일 이름은 서버마다 다를 수 있다 (지금 서버는 uriae.emilysoft.com). 찾기: grep -rl uriae.emilysoft.com /etc/nginx/
+F=/etc/nginx/sites-available/uriae.emilysoft.com
+sudo cp $F ~/uriae.emilysoft.com.bak
+grep -q nginx-feedback.conf $F || \
+  sudo sed -i 's|^\(\s*\)root /var/www/uriae;|&\n\1include /opt/uriae/server/nginx-feedback.conf;|' $F
 sudo nginx -t && sudo systemctl reload nginx
 # 확인: {"count": 0, ...} 이 나오면 성공
 curl -s https://uriae.emilysoft.com/api/feedback/summary
