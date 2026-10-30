@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="robots" content="noindex, nofollow" />
-  <title>방문 통계 · 우리애 한눈에</title>
+  <title>관리자 · 우리애 한눈에</title>
   <link rel="icon" href="favicon.png" />
   <link rel="stylesheet" href="style.css" />
   <style>
@@ -24,6 +24,17 @@
     .bars .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .bars.wide li { grid-template-columns: 12em 1fr 3em; }
     .empty { color: var(--soft); padding: 8px 0; }
+    .fbs { list-style: none; margin: 0; padding: 0; }
+    .fbs li { padding: 14px 0 16px; border-bottom: 1px solid var(--rule); }
+    .fbs .meta { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; font-size: 14px; color: var(--soft); }
+    .fbs .kind { font-weight: 700; color: var(--ink); }
+    .fbs .kind.problem { color: #b3261e; }
+    .fbs .kind.idea { color: var(--pen); }
+    .fbs .star { color: #f5b301; letter-spacing: 1px; }
+    .fbs .text { margin: 6px 0 0; white-space: pre-wrap; word-break: break-word; }
+    .filters { display: flex; gap: 6px; flex-wrap: wrap; margin: 0 0 6px; }
+    .filters button { border: 1px solid var(--rule); background: transparent; color: var(--soft); border-radius: 99px; padding: 3px 12px; font: inherit; font-size: 14px; cursor: pointer; }
+    .filters button[aria-pressed="true"] { border-color: var(--ink); color: var(--ink); font-weight: 600; }
     @media (max-width: 560px) {
       .nums b { font-size: 26px; }
       .bars.wide li { grid-template-columns: 8em 1fr 2.5em; }
@@ -38,7 +49,18 @@
     </header>
 
     <main class="admin">
-      <h1>방문 통계</h1>
+      <h1>받은 의견</h1>
+      <p class="when" id="fbWhen">불러오는 중</p>
+      <div class="nums">
+        <div><b id="fbCount">-</b><span>받은 의견</span></div>
+        <div><b id="fbAvg">-</b><span>평균 별점</span></div>
+        <div><b id="fbWeek">-</b><span>최근 7일</span></div>
+      </div>
+      <h2>의견 목록</h2>
+      <div class="filters" id="fbFilters"></div>
+      <ul class="fbs" id="fbList"></ul>
+
+      <h1 style="margin-top:64px">방문 통계</h1>
       <p class="when" id="when">불러오는 중</p>
 
       <div class="nums">
@@ -84,6 +106,54 @@
       const dt = new Date(`${m[1]}-${m[2]}-${m[3]}T12:00:00+09:00`);
       return `${+m[2]}/${+m[3]} (${'일월화수목금토'[dt.getDay()]})`;
     };
+    // 받은 의견 (server/feedback.py)
+    const KIND = { review: '후기', problem: '불편·오류', idea: '바라는 기능' };
+    fetch('/api/admin/feedback', { cache: 'no-store' })
+      .then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); })
+      .then(({ summary, items }) => {
+        $('fbWhen').textContent = `${new Date().toLocaleString('ko-KR')} 기준 · 1년 지난 의견은 자동으로 지워져요`;
+        $('fbCount').textContent = summary.count.toLocaleString('ko-KR');
+        $('fbAvg').textContent = summary.avg ? `★ ${summary.avg}` : '-';
+        const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString();
+        $('fbWeek').textContent = items.filter((it) => new Date(it.at).toISOString() >= weekAgo).length.toLocaleString('ko-KR');
+        let filter = 'all';
+        const draw = () => {
+          const list = $('fbList');
+          list.replaceChildren();
+          const shown = items.filter((it) => filter === 'all' || it.kind === filter);
+          if (!shown.length) { list.append(el('li', 'empty', '아직 받은 의견이 없어요')); return; }
+          for (const it of shown) {
+            const meta = el('div', 'meta');
+            meta.append(el('span', `kind ${it.kind}`, KIND[it.kind] || it.kind));
+            if (it.rating) meta.append(el('span', 'star', '★'.repeat(it.rating) + '☆'.repeat(5 - it.rating)));
+            meta.append(el('span', null, new Date(it.at).toLocaleString('ko-KR', { dateStyle: 'medium', timeStyle: 'short' })));
+            meta.append(el('span', null, it.source === 'extension' ? `확장에서${it.version ? ` (v${it.version})` : ''}` : '홈페이지에서'));
+            if (it.email) {
+              const a = el('a', null, it.email);
+              a.href = `mailto:${it.email}?subject=${encodeURIComponent('[우리애 한눈에] 보내주신 의견에 대한 답장')}`;
+              meta.append(a);
+            }
+            const li = el('li');
+            li.append(meta);
+            if (it.text) li.append(el('p', 'text', it.text));
+            list.append(li);
+          }
+        };
+        const filters = $('fbFilters');
+        [['all', `전체 ${summary.count}`], ...Object.entries(KIND).map(([k, v]) => [k, `${v} ${summary.kinds[k] || 0}`])].forEach(([k, label]) => {
+          const b = el('button', null, label);
+          b.setAttribute('aria-pressed', String(k === filter));
+          b.onclick = () => {
+            filter = k;
+            filters.querySelectorAll('button').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+            draw();
+          };
+          filters.append(b);
+        });
+        draw();
+      })
+      .catch(() => { $('fbWhen').textContent = '의견 접수 프로그램에 연결하지 못했어요. 서버에서 systemctl status uriae-feedback 을 확인해 주세요.'; });
+
     fetch('admin-data.json', { cache: 'no-store' })
       .then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); })
       .then((j) => {

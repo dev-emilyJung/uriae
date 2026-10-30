@@ -1,0 +1,19 @@
+# /etc/systemd/system/uriae-feedback.service
+# 홈페이지 의견 접수 (server/feedback.py). 의견 파일: /var/lib/uriae/feedback.jsonl
+[Unit]
+Description=uriae homepage feedback
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/python3 /opt/uriae/server/feedback.py
+Environment=PYTHONUNBUFFERED=1
+DynamicUser=yes
+StateDirectory=uriae
+Restart=on-failure
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+NoNewPrivileges=yes
+
+[Install]
+WantedBy=multi-user.target

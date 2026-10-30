@@ -23,7 +23,7 @@
         <a href="#what">하는 일</a>
         <a href="#how">설치</a>
         <a href="#faq">자주 묻는 질문</a>
-        <a href="#support">응원</a>
+        <a href="#feedback">의견</a>
       </nav>
     </header>
 
@@ -123,16 +123,90 @@
       </details>
     </section>
 
-    <section class="part col support" id="support">
-      <h2>응원하기</h2>
-      <p>도움이 되셨다면 같은 반 부모님들께 알려 주세요. 크롬 웹스토어에 별점과 한 줄 후기를 남겨 주시면 다른 부모님들이 찾기 쉬워집니다.</p>
+    <section class="part col support" id="feedback">
+      <h2>의견 보내기</h2>
+      <p>써 보신 후기, 불편했던 점, 바라는 기능 무엇이든 좋아요. 보내 주신 의견은 만든 사람만 보고, 하나하나 읽으며 고쳐 나갑니다.</p>
+      <p class="tally" id="tally" hidden></p>
+      <form class="fb" id="fb" novalidate>
+        <div class="kinds" role="radiogroup" aria-label="의견 종류">
+          <label><input type="radio" name="kind" value="review" checked /><span>후기</span></label>
+          <label><input type="radio" name="kind" value="problem" /><span>불편·오류</span></label>
+          <label><input type="radio" name="kind" value="idea" /><span>바라는 기능</span></label>
+        </div>
+        <div class="stars" role="radiogroup" aria-label="별점">
+          <label title="1점"><input type="radio" name="rating" value="1" /><span>★</span></label>
+          <label title="2점"><input type="radio" name="rating" value="2" /><span>★</span></label>
+          <label title="3점"><input type="radio" name="rating" value="3" /><span>★</span></label>
+          <label title="4점"><input type="radio" name="rating" value="4" /><span>★</span></label>
+          <label title="5점"><input type="radio" name="rating" value="5" /><span>★</span></label>
+          <small id="starText">별점을 눌러 주세요 (선택)</small>
+        </div>
+        <textarea name="text" rows="5" maxlength="2000" placeholder="예) 단체사진에서 우리 아이를 잘 찾아줘서 편해요 / 이런 사진이 자꾸 섞여요 / 이런 기능이 있으면 좋겠어요"></textarea>
+        <p class="hint">아이 이름, 사진, 키즈노트 계정 같은 개인정보는 적지 말아 주세요.</p>
+        <input type="email" name="email" maxlength="200" placeholder="답장받을 이메일 (선택)" autocomplete="email" />
+        <input class="trap" type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" />
+        <div class="send">
+          <button class="btn" type="submit">보내기</button>
+          <span id="fbMsg" role="status"></span>
+        </div>
+        <p class="hint">이메일을 남기시면 답장에만 쓰고, 받은 의견은 1년 뒤 지웁니다. <a href="privacy.html#feedback">개인정보처리방침</a></p>
+      </form>
+
+      <h3>주변 부모님께 알리기</h3>
+      <p>같은 반 부모님들께 알려 주시는 게 가장 큰 응원이에요.</p>
       <div class="actions">
-        <button class="btn" id="share" type="button">링크 공유하기</button>
-        <a class="btn ghost" aria-disabled="true">웹스토어 후기 남기기 (준비 중)</a>
+        <button class="btn ghost" id="share" type="button">링크 공유하기</button>
       </div>
       <p class="dev">개발자라면 <a href="https://github.com/dev-emilyJung/uriae">GitHub에서 별</a>을 눌러 주셔도 큰 힘이 됩니다.</p>
     </section>
     <script>
+      // 의견 보내기
+      (() => {
+        const form = document.getElementById('fb');
+        const msg = document.getElementById('fbMsg');
+        const starText = document.getElementById('starText');
+        const WORDS = ['', '별로예요', '아쉬워요', '보통이에요', '좋아요', '최고예요'];
+        const paint = () => {
+          const v = Number(form.rating.value || 0);
+          form.querySelectorAll('.stars label').forEach((l, i) => l.classList.toggle('on', i < v));
+          starText.textContent = v ? `${v}점 · ${WORDS[v]}` : '별점을 눌러 주세요 (선택)';
+        };
+        form.querySelectorAll('input[name=rating]').forEach((r) => r.addEventListener('change', paint));
+        // 확장 화면의 "의견 보내기"로 들어오면 어디서 왔는지 함께 기록 (?from=extension&v=1.0.0)
+        const q = new URLSearchParams(location.search);
+        form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const body = {
+            kind: form.kind.value, rating: form.rating.value || null, text: form.text.value.trim(),
+            email: form.email.value.trim(), website: form.website.value,
+            source: q.get('from') === 'extension' ? 'extension' : 'site', version: q.get('v') || '',
+          };
+          if (!body.text && !body.rating) { msg.textContent = '별점이나 내용을 남겨 주세요.'; return; }
+          const btn = form.querySelector('button[type=submit]');
+          btn.disabled = true;
+          msg.textContent = '보내는 중…';
+          try {
+            const r = await fetch('/api/feedback', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+            const j = await r.json().catch(() => ({}));
+            if (!r.ok) throw new Error(j.error || '잠시 후 다시 보내 주세요');
+            form.reset();
+            paint();
+            msg.textContent = '고맙습니다! 잘 받았어요.';
+          } catch (err) {
+            msg.textContent = `보내지 못했어요. ${err.message}`;
+          } finally {
+            btn.disabled = false;
+          }
+        });
+        // 받은 의견이 어느 정도 쌓이면 누적 수와 평균 별점을 보여준다
+        fetch('/api/feedback/summary').then((r) => (r.ok ? r.json() : null)).then((s) => {
+          if (!s || s.count < 5) return;
+          const t = document.getElementById('tally');
+          t.textContent = `지금까지 받은 의견 ${s.count.toLocaleString('ko-KR')}개${s.avg ? ` · 평균 별점 ★ ${s.avg}` : ''}`;
+          t.hidden = false;
+        }).catch(() => {});
+      })();
+
       // 휴대폰은 공유 창(카카오톡 등), PC는 링크 복사
       document.getElementById('share').addEventListener('click', async (e) => {
         const btn = e.currentTarget;

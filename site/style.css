@@ -93,8 +93,29 @@ ol.how li::marker { font-family: var(--serif); font-weight: 700; }
 .faq details[open] summary::after { content: "−"; }
 .faq details p { margin: 10px 0 0; color: var(--soft); }
 .support p { color: var(--soft); max-width: 34em; }
-.support .actions { margin: 24px 0 18px; }
 .support .dev { font-size: 14px; }
+.support h3 { font: 700 19px/1.4 var(--serif); margin: 48px 0 6px; }
+.support .actions { margin: 16px 0 14px; }
+.tally { font-weight: 600; color: var(--ink) !important; }
+.fb { max-width: 36em; margin-top: 22px; display: grid; gap: 14px; }
+.fb .kinds { display: flex; flex-wrap: wrap; gap: 8px; }
+.fb .kinds input { position: absolute; opacity: 0; pointer-events: none; }
+.fb .kinds span { display: inline-block; padding: 6px 14px; border: 1px solid var(--rule); border-radius: 99px; font-size: 15px; cursor: pointer; color: var(--soft); }
+.fb .kinds input:checked + span { border-color: var(--ink); color: var(--ink); font-weight: 600; }
+.fb .kinds input:focus-visible + span, .fb .stars input:focus-visible + span { outline: 2px solid var(--pen); outline-offset: 2px; }
+.fb .stars { display: flex; align-items: center; gap: 2px; }
+.fb .stars input { position: absolute; opacity: 0; pointer-events: none; }
+.fb .stars span { font-size: 30px; line-height: 1; color: var(--rule); cursor: pointer; padding: 0 2px; }
+.fb .stars label.on span { color: #f5b301; }
+.fb .stars small { margin-left: 10px; color: var(--soft); font-size: 14px; }
+.fb textarea, .fb input[type=email] { width: 100%; font: inherit; font-size: 16px; color: var(--ink); background: var(--paper); border: 1px solid var(--rule); border-radius: 2px; padding: 12px 14px; }
+.fb textarea { resize: vertical; line-height: 1.6; }
+.fb textarea:focus, .fb input[type=email]:focus { outline: none; border-color: var(--pen); }
+.fb .hint { margin: -6px 0 0 !important; font-size: 13px; }
+.fb .trap { position: absolute; left: -9999px; width: 1px; height: 1px; }
+.fb .send { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.fb .send span { color: var(--soft); font-size: 15px; }
+button.btn:disabled { opacity: 0.5; cursor: default; }
 button.btn { border: 0; cursor: pointer; font-family: inherit; line-height: inherit; }
 .btn.ghost { background: transparent; color: var(--ink); box-shadow: inset 0 0 0 1px var(--rule); }
 .btn.ghost[aria-disabled="true"] { background: transparent; color: var(--soft); }

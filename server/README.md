@@ -44,3 +44,26 @@ https://uriae.emilysoft.com/admin.html 접속 → 아이디·비밀번호 입력
 
 확장은 아무 데이터도 보내지 않으므로 여기서는 알 수 없다.
 크롬 웹스토어 개발자 대시보드 → 항목 → 통계(주간 사용자, 설치·삭제, 지역·버전)에서 확인한다.
+
+## 3. 홈페이지 의견 받기 (/api/feedback)
+
+홈페이지의 "의견 보내기"를 받는 작은 프로그램(`server/feedback.py`, Python 표준 라이브러리만 사용)을 띄운다.
+의견은 `/var/lib/uriae/feedback.jsonl` 에 한 줄씩 쌓이고, 1년 지난 것은 자동으로 지워진다. IP 는 저장하지 않는다.
+
+```bash
+cd /opt/uriae && sudo git pull
+# 접수 프로그램 상시 실행
+sudo cp server/uriae-feedback.service /etc/systemd/system/
+sudo systemctl daemon-reload && sudo systemctl enable --now uriae-feedback
+# nginx 연결: 연속 제출 제한 영역 + 사이트 설정에 include 한 줄 (certbot 이 고친 설정은 그대로 두고 한 줄만 넣는다)
+sudo cp server/nginx-feedback-zone.conf /etc/nginx/conf.d/uriae-feedback-zone.conf
+grep -q nginx-feedback.conf /etc/nginx/sites-available/uriae || \
+  sudo sed -i 's|^\(\s*\)root /var/www/uriae;|&\n\1include /opt/uriae/server/nginx-feedback.conf;|' /etc/nginx/sites-available/uriae
+sudo nginx -t && sudo systemctl reload nginx
+# 확인: {"count": 0, ...} 이 나오면 성공
+curl -s https://uriae.emilysoft.com/api/feedback/summary
+```
+
+받은 의견은 관리자 페이지(https://uriae.emilysoft.com/admin.html) 맨 위에서 본다.
+`feedback.py` 를 고친 뒤에는 `sudo systemctl restart uriae-feedback`, `nginx-feedback.conf` 를 고친 뒤에는 `sudo systemctl reload nginx`.
+의견 파일 백업: `sudo cp /var/lib/uriae/feedback.jsonl ~/feedback-$(date +%F).jsonl`

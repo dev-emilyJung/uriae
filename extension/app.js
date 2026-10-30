@@ -3,6 +3,8 @@ import { buildCards, ymd } from './lib/extract.js';
 import { store, K } from './lib/store.js';
 
 const main = document.getElementById('main');
+// 홈페이지 "의견 보내기"로 갈 때 어느 버전에서 왔는지 함께 (주소에만 붙고, 이용자가 직접 보낼 때만 기록된다)
+document.getElementById('feedbackLink').href = `https://uriae.emilysoft.com/?from=extension&v=${chrome.runtime.getManifest().version}#feedback`;
 const classBar = document.getElementById('classBar');
 const WEEK = ['일', '월', '화', '수', '목', '금', '토'];
 
