@@ -343,7 +343,7 @@ function classifyKid(kid, mine, reports, strictness) {
     }
   };
 
-  // 1차: 등록한 기준 얼굴 + 사용자가 "맞아요"라고 한 얼굴
+  // 1차: 등록한 기준 얼굴 + 사용자가 크게 보기에서 "이 얼굴이 우리 아이"라고 확인한 얼굴
   const extra = [...fb.pos.values()].map((p) => ({ emb: p.emb, date: p.date }));
   pass(extra);
   // 2차: 1차에서 아주 확실했던 얼굴을 같은 시기 기준 얼굴로 더해 다시 판정 (사용자가 "아니에요"라고 한 사진은 제외)
@@ -492,8 +492,12 @@ function drawResults(container) {
   /**
    * 사진 하나를 "우리 아이 맞음/아님"으로 표시하고, 고친 내용을 다음 판정용으로 기억한다.
    * idx: 우리 아이 얼굴 번호. 크게 보기에서 다른 얼굴을 누르면 그 얼굴로 바뀐다.
+   * seen: 크게 보기에서 노란 네모(짚은 얼굴)를 보고 답했는지.
+   *   "맞아요"는 seen일 때만 그 얼굴을 우리 아이로 배운다. 목록에서는 짚은 얼굴이 안 보여서, 단체사진이면
+   *   옆 친구 얼굴을 우리 아이로 배우고 그 친구 사진이 줄줄이 들어오게 된다.
+   *   "아니에요"는 짚은 얼굴이 우리 아이가 아니라는 뜻이라 어디서든 배운다.
    */
-  const mark = (g, x, kind, yes, idx = x.faceIdx) => {
+  const mark = (g, x, kind, yes, { idx = x.faceIdx, seen = false } = {}) => {
     const key = `${g.child}:${x.img.id}`;
     const fb = fbOf(g.child);
     const faces = faceMem.get(x.img.id) || [];
@@ -501,15 +505,19 @@ function drawResults(container) {
     if (yes) {
       s.selected.add(key);
       fb.neg.delete(key);
-      // 확인 필요에서 고르거나 얼굴을 직접 고르면 "이 얼굴은 우리 아이"로 기억
-      if (face && (kind === 'maybe' || idx !== x.faceIdx)) fb.pos.set(key, { emb: face.emb, date: x.date });
-      // 잘못 짚었던 얼굴은 "다른 아이"로 기억
-      if (idx !== x.faceIdx && faces[x.faceIdx]) fb.neg.set(`${key}#${x.faceIdx}`, { emb: faces[x.faceIdx].emb });
-      x.faceIdx = idx;
+      if (seen && face && (kind === 'maybe' || idx !== x.faceIdx)) {
+        s.manual?.delete(key);
+        fb.pos.set(key, { emb: face.emb, date: x.date });
+        // 잘못 짚었던 얼굴은 "다른 아이"로 기억
+        if (idx !== x.faceIdx && faces[x.faceIdx]) fb.neg.set(`${key}#${x.faceIdx}`, { emb: faces[x.faceIdx].emb });
+        x.faceIdx = idx;
+      } else if (!seen) {
+        (s.manual ??= new Set()).add(key); // 배우지 않고 고르기만. 다시 찾아도 고른 상태 유지
+      }
     } else {
       s.selected.delete(key);
+      s.manual?.delete(key);
       fb.pos.delete(key);
-      // 아니라고 한 사진의 얼굴은 "다른 아이"로 기억
       if (face) fb.neg.set(key, { emb: face.emb });
     }
     tiles.get(key)?.classList.toggle('sel', yes);
@@ -582,7 +590,7 @@ function drawResults(container) {
           title: me ? '우리 아이로 본 얼굴' : '이 아이가 우리 아이예요',
           style: `left:${bx * 100}%;top:${by * 100}%;width:${bw * 100}%;height:${bh * 100}%`,
         });
-        b.onclick = () => { mark(g, x, kind, true, idx); show(); };
+        b.onclick = () => { mark(g, x, kind, true, { idx, seen: true }); show(); };
         return b;
       });
       stage.replaceChildren(h('div', { class: 'vw-frame' }, img, boxes));
@@ -603,7 +611,7 @@ function drawResults(container) {
     };
     const answer = (yes) => {
       const { g, x, kind } = items[i];
-      mark(g, x, kind, yes);
+      mark(g, x, kind, yes, { seen: true });
       if (i === items.length - 1) close();
       else go(1);
     };
@@ -649,6 +657,8 @@ function drawResults(container) {
     s.groups = s.kids.map((kid) => classifyKid(kid, s.jobs.albumJobs.filter((j) => j.kid === kid), s.jobs.reportJobs.filter((j) => j.kid === kid), strictness));
     // 선택 상태도 새 판정에 맞춘다 (직접 고친 것은 유지)
     s.selected = new Set(s.groups.flatMap((g) => [...g.reports, ...g.sure].map((j) => `${g.child}:${j.img.id}`)));
+    // 목록에서 체크로 고른 사진(배우지 않은 것)도 고른 상태 유지
+    for (const k of s.manual || []) s.selected.add(k);
     drawResults(container);
     const st = main.querySelector('.toolbar + .muted');
     if (st) st.textContent = summaryText(s.groups);
@@ -669,7 +679,7 @@ function drawResults(container) {
     block('우리 아이', '사진을 누르면 크게 보여요. 아닌 사진은 체크를 눌러 빼 주세요', g.sure, 'sure');
     block('알림장 사진', '선생님이 우리 아이에게 보낸 사진', g.reports, 'report');
     block('알림장 첨부 자료', '얼굴이 없는 사진(안내문·배치도 등) · 필요하면 체크해서 받으세요', g.notices, 'notice');
-    block('확인이 필요해요', '하나씩 크게 보면서 Y(맞아요) / N(아니에요)로 빠르게 고를 수 있어요', g.maybe, 'maybe');
+    block('확인이 필요해요', '하나씩 크게 보며 Y/N으로 고르면, 노란 네모 얼굴을 우리 아이로 배워서 다시 찾을 때 반영돼요', g.maybe, 'maybe');
     if (multi && !g.sure.length && !g.maybe.length && !g.reports.length && !g.notices.length) {
       nodes.push(h('div', { class: 'section-label' }, givenName(g.name), h('small', {}, '찾은 사진이 없어요')));
     }
