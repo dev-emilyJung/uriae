@@ -107,6 +107,22 @@ export function pickAutoRefs(cands, th, { margin = 1, max = 30 } = {}) {
     .map((c) => ({ emb: c.emb, date: c.date, auto: true }));
 }
 
+/** 시기마다 권장하는 기준 얼굴 수. 최소 2개면 찾을 수 있고, 5개면 각도·표정이 섞여 단체사진에서도 잘 찾는다 */
+export const REF_MIN = 2;
+export const REF_GOAL = 5;
+
+/**
+ * sinceYMD ~ untilYMD 사진을 찾을 때 기준 얼굴이 부족한 시기.
+ * 시기 가운데 날짜에서 ±6개월 안의 기준 얼굴이 REF_MIN개보다 적으면 그 시기 사진은 잘 못 찾는다.
+ */
+export function missingPeriods(periods, refs, sinceYMD, untilYMD = '9999-12-31') {
+  return periods.filter((p) => {
+    if (p.end < sinceYMD || p.start > untilYMD) return false;
+    const mid = (Date.parse(p.start) + Date.parse(p.end)) / 2;
+    return refs.filter((r) => r.date && Math.abs(Date.parse(r.date) - mid) <= 183 * DAY).length < REF_MIN;
+  });
+}
+
 /** 생년월일 기준 6개월 단위 기간 목록 (최근 maxYears 년) */
 export function agePeriods(birthYMD, todayYMD, maxYears = 3) {
   const out = [];
@@ -130,4 +146,42 @@ export function agePeriods(birthYMD, todayYMD, maxYears = 3) {
     });
   }
   return out.reverse(); // 최근 기간부터
+}
+
+/**
+ * 사진 찾기 기간 목록: 최근 2주~1년, 그다음 예전 1년 단위 (한 번에 최대 1년치만 찾는다).
+ * periods: agePeriods 또는 recentPeriods 결과 (최근부터, 6개월 단위). 생년월일이 있으면 만 나이 1년 단위로 묶는다.
+ * → [{ since, until, label }]
+ */
+export function searchRanges(todayYMD, periods, hasBirth) {
+  const back = (days) => new Date(Date.parse(todayYMD) - days * DAY).toISOString().slice(0, 10);
+  const out = [[14, '최근 2주'], [30, '최근 1개월'], [90, '최근 3개월'], [180, '최근 6개월'], [365, '최근 1년']]
+    .map(([d, label]) => ({ since: back(d), until: todayYMD, label }));
+  const years = new Map();
+  periods.forEach((p, i) => {
+    const key = hasBirth ? p.label.replace(/ (전반|후반)$/, '') : `${Math.floor(i / 2)}~${Math.floor(i / 2) + 1}년 전`;
+    const y = years.get(key);
+    if (y) { y.since = p.start < y.since ? p.start : y.since; y.until = p.end > y.until ? p.end : y.until; }
+    else years.set(key, { since: p.start, until: p.end, label: key });
+  });
+  // 생년월일을 모를 때 맨 앞 1년은 "최근 1년"과 같으므로 뺀다
+  const list = [...years.values()].filter((y) => hasBirth || !y.label.startsWith('0~'));
+  for (const y of list) y.label += ` (${y.since.slice(0, 7).replace('-', '.')} ~ ${y.until.slice(0, 7).replace('-', '.')})`;
+  return [...out, ...list];
+}
+
+/** 생년월일을 모를 때: 오늘부터 6개월씩 거슬러 올라간 기간 목록 (최근 기간부터) */
+export function recentPeriods(todayYMD, maxYears = 3) {
+  return Array.from({ length: maxYears * 2 }, (_, i) => {
+    const end = new Date(todayYMD + 'T00:00:00Z');
+    end.setUTCMonth(end.getUTCMonth() - 6 * i);
+    if (i) end.setUTCDate(end.getUTCDate() - 1);
+    const start = new Date(todayYMD + 'T00:00:00Z');
+    start.setUTCMonth(start.getUTCMonth() - 6 * (i + 1));
+    return {
+      start: start.toISOString().slice(0, 10),
+      end: end.toISOString().slice(0, 10),
+      label: i ? `${6 * i}~${6 * i + 6}개월 전` : '최근 6개월',
+    };
+  });
 }

@@ -361,46 +361,72 @@ async function readDocImages(run, posts, ocr, status, draw) {
 // 판정: 1024px 사진에서 얼굴을 찾고, 사진 날짜와 가까운 시기의 기준 얼굴로 비교한 뒤
 //       이번에 확인한 모든 얼굴의 점수 분포에서 "튀게 높은" 것만 우리 아이로 본다.
 // 저장: 사진별 얼굴 점수(숫자)만 저장. 다른 아이들의 얼굴 특징값은 저장하지 않는다.
-// 한 번에 찾는 최대 기간. 사진을 한 장씩 살펴보므로 너무 길면 몇 시간이 걸리고 키즈노트 서버에도 부담이 된다
-const MAX_DAYS = 365;
 let stopRequested = false;
 let photoState = null;
 const faceMem = new Map(); // 사진 id → 얼굴 특징값 (이 탭이 열려 있는 동안만, 저장 안 함)
 const selSig = () => [...selected].sort().join(',');
 const refsSig = (refs) => refs.map((r) => r.id).sort().join(',');
 
-async function showPhotos() {
+let lastPeriod = '최근 1개월'; // 사진 탭에서 고른 기간 (기준 얼굴을 고르고 돌아와도 유지)
+
+async function showPhotos(flash = '') {
+  const { REF_MIN, REF_GOAL, missingPeriods, searchRanges } = await import('./lib/match.js');
   const kids = kidsOf(selectedEnrollments());
   for (const k of kids) await upgradeRefs(k.child);
   const withRefs = [];
   const noRefs = [];
   for (const k of kids) {
     k.refs = await store.get(K.refs(k.child), []);
-    (k.refs.length >= 2 ? withRefs : noRefs).push(k);
+    k.periods = await periodsOf(k);
+    (k.refs.length >= REF_MIN ? withRefs : noRefs).push(k);
   }
   if (!withRefs.length) {
-    return render(stateView('먼저 아이 얼굴을 2개 이상 등록해 주세요', '기간별로 2개씩 등록하면 가장 정확해요. 알림장 사진 속 얼굴을 눌러서 고를 수 있어요.',
+    return render(stateView(`먼저 아이 얼굴을 ${REF_MIN}개 이상 등록해 주세요`, `최근 사진 속 우리 아이 얼굴을 ${REF_GOAL}개 정도 고르면 가장 정확해요. 알림장 사진 속 얼굴을 눌러서 고를 수 있어요.`,
       h('button', { class: 'btn', onclick: () => showTab('faces') }, '기준 얼굴 등록하기')));
   }
+  // 최근 기간 + 예전 1년 단위. 한 번에 최대 1년치만 찾는다 (사진을 한 장씩 살펴보므로 길면 몇 시간이 걸리고 서버에도 부담)
+  const ranges = searchRanges(today(), withRefs[0].periods, !!withRefs[0].birth);
   const period = h('select', { 'aria-label': '기간' },
-    h('option', { value: '14' }, '최근 2주'),
-    h('option', { value: '30', selected: true }, '최근 1개월'),
-    h('option', { value: '90' }, '최근 3개월'),
-    h('option', { value: '180' }, '최근 6개월'),
-    h('option', { value: '365' }, '최근 1년'),
+    ranges.slice(0, 5).map((r, i) => h('option', { value: i, selected: r.label === lastPeriod }, r.label)),
+    ranges.length > 5 ? h('optgroup', { label: '예전 사진 (1년씩)' },
+      ranges.slice(5).map((r, i) => h('option', { value: i + 5, selected: r.label === lastPeriod }, r.label))) : null,
   );
+  const range = () => ranges[Number(period.value)];
   const runBtn = h('button', { class: 'btn' }, '우리 애 사진 찾기');
   const stopBtn = h('button', { class: 'btn ghost', hidden: true, onclick: () => { stopRequested = true; stopBtn.textContent = '멈추는 중…'; } }, '중지하고 지금까지 결과 보기');
-  const status = h('div', { class: 'muted' },
-    `예전 반과 다른 기관 사진까지, 반과 상관없이 ${withRefs.map((k) => givenName(k.name)).join(', ')}의 사진을 찾아요. 사진을 하나씩 살펴보기 때문에 한 번에 최대 1년까지 찾을 수 있어요.`);
+  const status = h('div', { class: 'muted' }, flash ||
+    `예전 반과 다른 기관 사진까지, 반과 상관없이 ${withRefs.map((k) => givenName(k.name)).join(', ')}의 사진을 찾아요.`);
   const warn = noRefs.length
     ? h('div', { class: 'muted', style: 'margin-top:4px' }, `${noRefs.map((k) => givenName(k.name)).join(', ')}는 기준 얼굴이 부족해서 이번엔 빠져요. `,
         h('a', { href: '#', onclick: (ev) => { ev.preventDefault(); showTab('faces'); } }, '등록하기'))
     : null;
+  // 고른 기간 안에 기준 얼굴이 부족한 시기가 있으면, 찾기 전에 그 시기 얼굴을 고르도록 안내한다
+  const gaps = h('div');
+  const drawGaps = () => {
+    const { since, until, label } = range();
+    lastPeriod = label;
+    const rows = withRefs.flatMap((k) => missingPeriods(k.periods, k.refs, since, until).map((p) => ({ k, p })));
+    const long = daysBetween(since, until) > 200;
+    gaps.replaceChildren(...[
+      rows.length ? h('div', { class: 'gaps' },
+        h('b', {}, '이 기간에 기준 얼굴이 부족한 시기가 있어요'),
+        h('p', { class: 'muted' }, `그 시기 사진은 놓치기 쉬워요. 시기마다 ${REF_MIN}개 이상(${REF_GOAL}개 정도면 더 좋아요) 골라 주시거나, 그대로 찾아도 돼요.`),
+        // 키즈노트를 쓰기 전 시기까지 줄줄이 나오지 않게 최근 4개만 (나머지는 기준 얼굴 탭에서)
+        h('div', { class: 'toolbar' }, rows.slice(0, 4).map(({ k, p }) => h('button', {
+          class: 'btn ghost small',
+          onclick: () => showPicker(k, p, (msg) => showPhotos(msg)),
+        }, `${withRefs.length > 1 ? givenName(k.name) + ' ' : ''}${p.label} 고르기`)),
+        rows.length > 4 ? h('a', { href: '#', onclick: (ev) => { ev.preventDefault(); showTab('faces'); } }, `외 ${rows.length - 4}개 시기`) : null),
+      ) : null,
+      long ? h('div', { class: 'muted', style: 'margin-top:4px' }, '사진을 한 장씩 살펴보기 때문에 오래 걸릴 수 있어요. 중간에 멈추면 그때까지 찾은 결과를 보여드려요.') : null,
+    ].filter(Boolean));
+  };
+  period.onchange = drawGaps;
+  drawGaps();
   const bar = h('div', { class: 'progress', hidden: true }, h('div'));
   const results = h('div');
-  runBtn.onclick = () => runSearch(Math.min(Number(period.value) || MAX_DAYS, MAX_DAYS), withRefs, { runBtn, stopBtn, status, bar, results });
-  render(h('div', { class: 'toolbar' }, period, runBtn, stopBtn), status, warn, bar, results);
+  runBtn.onclick = () => runSearch(range(), withRefs, { runBtn, stopBtn, status, bar, results });
+  render(h('div', { class: 'toolbar' }, period, runBtn, stopBtn), status, warn, gaps, bar, results);
   if (photoState && photoState.sig === selSig()) drawResults(results);
 }
 
@@ -475,7 +501,7 @@ function classifyKid(kid, mine, reports, strictness) {
 }
 let matchLib = null;
 
-async function runSearch(days, kids, ui) {
+async function runSearch({ since, until }, kids, ui) {
   matchLib = await import('./lib/match.js');
   const { initFace, detectFaces } = await import('./lib/face.js');
 
@@ -485,7 +511,6 @@ async function runSearch(days, kids, ui) {
   ui.bar.hidden = false;
   ui.results.replaceChildren();
   const fill = ui.bar.firstChild;
-  const since = cutoffYMD(days);
 
   try {
     ui.status.textContent = '얼굴 인식 모델을 준비하는 중…';
@@ -498,6 +523,7 @@ async function runSearch(days, kids, ui) {
     for (const kid of kids) {
       const seen = new Set();
       for await (const r of paginate(api.childReports, { child: kid.child }, { stop: (x) => postYMD(x) < since, maxPages: 100 })) {
+        if (postYMD(r) > until) continue; // 최신순이라 고른 기간보다 새 글은 건너뛴다
         for (const img of r.attached_images || []) {
           if (seen.has(img.id)) continue;
           seen.add(img.id);
@@ -505,6 +531,7 @@ async function runSearch(days, kids, ui) {
         }
       }
       for await (const a of paginate(api.childAlbums, { child: kid.child }, { stop: (x) => postYMD(x) < since, maxPages: 100 })) {
+        if (postYMD(a) > until) continue;
         for (const img of a.attached_images || []) {
           if (seen.has(img.id)) continue;
           seen.add(img.id);
@@ -879,8 +906,14 @@ async function saveRefs(childId, newRefs) {
   photoState = null;
 }
 
+/** 아이의 6개월 단위 시기 목록 (최근부터). 생년월일을 모르면 오늘부터 거슬러 올라간다 */
+async function periodsOf(kid) {
+  const { agePeriods, recentPeriods } = await import('./lib/match.js');
+  return kid.birth ? agePeriods(kid.birth, today(), 8) : recentPeriods(today(), 4);
+}
+
 async function showFaces(flash = '') {
-  const { agePeriods } = await import('./lib/match.js');
+  const { REF_MIN, REF_GOAL } = await import('./lib/match.js');
   const kids = kidsOf(enrollments);
   const kid = kids.find((k) => k.child === currentKid) || kids[0];
   const lost = await upgradeRefs(kid.child);
@@ -888,7 +921,7 @@ async function showFaces(flash = '') {
   const refs = await store.get(K.refs(kid.child), []);
   const strictness = await store.get(K.strictness, 0.5);
   const msg = h('div', { class: 'muted' }, flash);
-  const periods = kid.birth ? agePeriods(kid.birth, today(), 3) : [{ start: cutoffYMD(365), end: today(), label: '최근 1년' }];
+  const periods = await periodsOf(kid);
   const inPeriod = (r, p) => r.date && r.date >= p.start && r.date <= p.end;
   const undated = refs.filter((r) => !periods.some((p) => inPeriod(r, p)));
 
@@ -922,22 +955,33 @@ async function showFaces(flash = '') {
     photoState = null;
   };
 
+  const periodRow = (p) => {
+    const mine = refs.filter((r) => inPeriod(r, p));
+    return h('div', { class: 'period' + (mine.length < REF_MIN ? ' need' : '') },
+      h('div', { class: 'period-head' },
+        h('b', {}, p.label),
+        h('span', { class: 'muted' }, `${p.start.replaceAll('-', '.')} ~ ${p.end.replaceAll('-', '.')}`),
+        h('span', { class: 'count' }, mine.length >= REF_GOAL ? `${mine.length}개 ✓` : `${mine.length}/${REF_GOAL}개`),
+      ),
+      mine.length ? h('div', { class: 'refs' }, mine.map(refChip)) : null,
+      h('button', { class: 'btn ghost small', onclick: () => showPicker(kid, p) }, '이 시기 사진에서 고르기'),
+    );
+  };
+  // 처음엔 가장 최근 시기만 보이고, 예전 시기는 등록한 얼굴이 있는 것만 펼쳐 둔다
+  const shown = periods.filter((p, i) => i === 0 || refs.some((r) => inPeriod(r, p)));
+  const folded = periods.filter((p) => !shown.includes(p));
+  const first = !refs.length;
+
   render(
     h('section', { class: 'panel' },
       h('h2', {}, `${kid.name}의 기준 얼굴`),
-      h('p', { class: 'muted' }, '아이 얼굴은 금방 바뀌어서, 시기별로 2개씩 있으면 가장 정확해요. 사진을 찾을 때는 그 사진 날짜와 가까운 시기의 얼굴로 비교해요.'),
-      h('div', { class: 'periods' }, periods.map((p) => {
-        const mine = refs.filter((r) => inPeriod(r, p));
-        return h('div', { class: 'period' + (mine.length < 2 ? ' need' : '') },
-          h('div', { class: 'period-head' },
-            h('b', {}, p.label),
-            h('span', { class: 'muted' }, `${p.start.replaceAll('-', '.')} ~ ${p.end.replaceAll('-', '.')}`),
-            h('span', { class: 'count' }, mine.length >= 2 ? `${mine.length}개 ✓` : `${mine.length}/2개`),
-          ),
-          mine.length ? h('div', { class: 'refs' }, mine.map(refChip)) : null,
-          h('button', { class: 'btn ghost small', onclick: () => showPicker(kid, p) }, '이 시기 사진에서 고르기'),
-        );
-      })),
+      h('p', { class: 'muted' }, first
+        ? `처음이라면 가장 최근 시기에서 우리 아이 얼굴을 ${REF_GOAL}개 정도 골라 주세요. ${REF_MIN}개만 있어도 바로 사진을 찾을 수 있어요.`
+        : `아이 얼굴은 금방 바뀌어서, 시기마다 ${REF_GOAL}개 정도 있으면 가장 정확해요. 사진을 찾을 때는 그 사진 날짜와 가까운 시기의 얼굴로 비교해요.`),
+      h('div', { class: 'periods' }, shown.map(periodRow)),
+      folded.length ? h('details', { class: 'past' },
+        h('summary', {}, `예전 시기 ${folded.length}개 (예전 사진까지 찾을 때 골라 주세요)`),
+        h('div', { class: 'periods' }, folded.map(periodRow))) : null,
       undated.length ? h('div', {}, h('div', { class: 'section-label' }, '날짜 없는 기준 얼굴', h('small', {}, '예전 버전에서 등록한 얼굴')), h('div', { class: 'refs' }, undated.map(refChip))) : null,
       h('div', { class: 'toolbar', style: 'margin-top:12px' },
         h('button', { class: 'btn ghost small', onclick: () => fileInput.click() }, '내 사진 파일로 추가'),
@@ -964,15 +1008,16 @@ async function showFaces(flash = '') {
 }
 
 /** 그 시기의 알림장·앨범 사진에서 얼굴을 모아 보여주고, 우리 아이 얼굴을 눌러서 고르게 한다 */
-async function showPicker(kid, p) {
+async function showPicker(kid, p, done = (flash) => showFaces(flash)) {
   const { detectFaces, initFace, MODEL_ID } = await import('./lib/face.js');
+  const { REF_GOAL } = await import('./lib/match.js');
   const status = h('div', { class: 'muted' }, `${p.label} 사진을 찾는 중…`);
   const grid = h('div', { class: 'faces' });
   const picked = new Map();
   const saveBtn = h('button', { class: 'btn', disabled: true }, '선택한 얼굴 등록');
-  const back = h('button', { class: 'btn ghost small', onclick: () => showFaces() }, '← 돌아가기');
+  const back = h('button', { class: 'btn ghost small', onclick: () => done() }, '← 돌아가기');
   render(back, h('h2', { style: 'margin:14px 0 4px' }, `${kid.name} · ${p.label}`),
-    h('p', { class: 'muted' }, `${p.start.replaceAll('-', '.')} ~ ${p.end.replaceAll('-', '.')} 사진 속 얼굴이에요. 우리 아이 얼굴을 2개 이상 눌러 주세요.`),
+    h('p', { class: 'muted' }, `${p.start.replaceAll('-', '.')} ~ ${p.end.replaceAll('-', '.')} 사진 속 얼굴이에요. 우리 아이 얼굴을 ${REF_GOAL}개 정도 눌러 주세요.`),
     h('ul', { class: 'guide' },
       h('li', {}, h('b', {}, '가운데 얼굴만 봐요. '), '칸마다 가운데 얼굴 하나만 기준이 돼요. 친구들과 같이 찍은 사진이라도 가운데가 우리 아이면 골라도 돼요.'),
       h('li', {}, h('b', {}, '골고루 섞어 주세요. '), '정면 독사진에 단체사진 속 얼굴, 살짝 옆모습을 1~2개 섞으면 단체사진에서도 더 잘 찾아요.'),
@@ -981,7 +1026,7 @@ async function showPicker(kid, p) {
     status, grid, h('div', { class: 'dock' }, h('span', {}, '우리 아이 얼굴만 골라 주세요'), saveBtn));
   saveBtn.onclick = async () => {
     await saveRefs(kid.child, [...picked.values()]);
-    showFaces(`${picked.size}개 등록했어요`);
+    done(`${picked.size}개 등록했어요`);
   };
 
   try {

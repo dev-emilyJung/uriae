@@ -190,6 +190,9 @@ body.noscroll { overflow: hidden; }
 .period .refs { grid-column: 2; grid-row: 1 / span 2; margin: 0; }
 .period .btn { grid-column: 3; grid-row: 2; justify-self: end; }
 .refs { display: flex; flex-wrap: wrap; gap: 6px; }
+.gaps { margin-top: 12px; padding: 12px 14px; border-left: 3px solid var(--mark); background: var(--wash); }
+.gaps p { margin: 2px 0 10px; }
+.gaps .toolbar { margin: 0; }
 .ref { position: relative; width: 48px; height: 48px; border-radius: 2px; overflow: hidden; background: var(--wash); }
 .ref img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .ref button { position: absolute; inset: auto 0 0 0; border: 0; background: rgba(0, 0, 0, 0.6); color: #fff; font-size: 11px; padding: 1px 0; opacity: 0; transition: opacity 0.12s; }
