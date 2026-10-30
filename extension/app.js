@@ -129,9 +129,8 @@ function showLogin() {
     stateView(
       '키즈노트 웹에 먼저 로그인해 주세요',
       '이 도구는 브라우저에 로그인된 키즈노트 세션을 그대로 사용해요. 비밀번호는 받지도 저장하지도 않습니다.',
-      h('div', {},
-        h('a', { class: 'btn', href: 'https://www.kidsnote.com/', target: '_blank', rel: 'noopener', style: 'text-decoration:none;display:inline-block' }, '키즈노트 열기'),
-        ' ',
+      h('div', { class: 'toolbar' },
+        h('a', { class: 'btn', href: 'https://www.kidsnote.com/', target: '_blank', rel: 'noopener' }, '키즈노트 열기'),
         h('button', { class: 'btn ghost', onclick: () => location.reload() }, '로그인했어요'),
       ),
     ),
