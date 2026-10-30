@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { cosine, refsFor, faceScore, decide, judge, cohortStats, agePeriods } from '../extension/lib/match.js';
+import { cosine, refsFor, faceScore, decide, judge, cohortStats, agePeriods, pickAutoRefs } from '../extension/lib/match.js';
 
 test('cosine', () => {
   assert.equal(Math.round(cosine([1, 0], [1, 0]) * 100), 100);
@@ -47,3 +47,11 @@ test('생년월일 기준 6개월 기간', () => {
   assert.equal(p[1].label, '만 5세 전반');
 });
 
+
+test('자동 기준 얼굴: 기준선보다 훨씬 확실하고 큰 얼굴만', () => {
+  const th = decide(0.5); // sure 2
+  const c = (z, raw, size) => ({ emb: [z], date: '2026-10-01', z, raw, size });
+  const picked = pickAutoRefs([c(3.5, 0.6, 120), c(2.5, 0.6, 120), c(3.2, 0.35, 120), c(3.4, 0.6, 50), c(3.1, 0.5, 90)], th);
+  assert.deepEqual(picked.map((p) => p.emb[0]), [3.5, 3.1]);
+  assert.equal(pickAutoRefs(Array.from({ length: 50 }, () => c(4, 0.6, 100)), th).length, 30);
+});

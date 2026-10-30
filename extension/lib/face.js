@@ -97,20 +97,34 @@ function similarity(src, dst) {
   return { c, s, tx: dx - (c * sx - s * sy), ty: dy - (s * sx + c * sy) };
 }
 
-/** 정렬한 112×112 얼굴 → 특징값 */
+async function embedPixels(pixels) {
+  const tf = human.tf;
+  const input = tf.tidy(() => tf.expandDims(tf.div(tf.cast(tf.browser.fromPixels(pixels), 'float32'), 255), 0));
+  const out = embedder.execute(input);
+  const v = Array.from(await out.data());
+  tf.dispose([input, out]);
+  const n = Math.hypot(...v) || 1;
+  return v.map((x) => x / n);
+}
+
+/**
+ * 정렬한 112×112 얼굴 → 특징값.
+ * 좌우 반전한 얼굴의 특징값과 평균한다(ArcFace 표준 기법). 조명·고개 방향에 덜 흔들린다.
+ * 반전 없는 예전 특징값과도 방향이 거의 같아서 저장된 기준 얼굴은 그대로 쓴다.
+ */
 async function embed(canvas, mesh) {
   const m = similarity(fivePoints(mesh), TEMPLATE);
   const t = new OffscreenCanvas(112, 112);
   const ctx = t.getContext('2d', { willReadFrequently: true });
   ctx.setTransform(m.c, m.s, -m.s, m.c, m.tx, m.ty);
   ctx.drawImage(canvas, 0, 0);
-  const pixels = ctx.getImageData(0, 0, 112, 112);
-  const tf = human.tf;
-  const input = tf.tidy(() => tf.expandDims(tf.div(tf.cast(tf.browser.fromPixels(pixels), 'float32'), 255), 0));
-  const out = embedder.execute(input);
-  const v = Array.from(await out.data());
-  tf.dispose([input, out]);
-  return v;
+  const a = await embedPixels(ctx.getImageData(0, 0, 112, 112));
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, 112, 112);
+  ctx.setTransform(-m.c, m.s, m.s, m.c, 112 - m.tx, m.ty);
+  ctx.drawImage(canvas, 0, 0);
+  const b = await embedPixels(ctx.getImageData(0, 0, 112, 112));
+  return a.map((x, i) => x + b[i]);
 }
 
 /**

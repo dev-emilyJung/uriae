@@ -88,6 +88,23 @@ export function judge(emb, faceStat, refs, neg, th) {
   return { level: 0, z, raw };
 }
 
+/** 이보다 작은 얼굴(px)은 특징값이 흔들려서 "우리 아이"로 확정하지 않고 "확인 필요"로 둔다 */
+export const SURE_MIN_PX = 48;
+
+/**
+ * 1차 판정에서 아주 확실한 얼굴을 기준 얼굴로 추가 (같은 시기의 우리 아이 얼굴이라 다음 판정에 가장 도움이 된다).
+ * 다른 아이가 섞이면 그 아이 사진이 줄줄이 따라 들어오므로, 기준선보다 margin 이상 높고
+ * 충분히 큰 얼굴만, 점수 높은 순으로 max개까지.
+ * cands: [{emb, date, z, raw, size}]
+ */
+export function pickAutoRefs(cands, th, { margin = 1, max = 30 } = {}) {
+  return cands
+    .filter((c) => c.z >= th.sure + margin && c.raw >= th.rawSure + 0.1 && c.size >= SURE_MIN_PX * 1.5)
+    .sort((a, b) => b.z - a.z)
+    .slice(0, max)
+    .map((c) => ({ emb: c.emb, date: c.date, auto: true }));
+}
+
 /** 생년월일 기준 6개월 단위 기간 목록 (최근 maxYears 년) */
 export function agePeriods(birthYMD, todayYMD, maxYears = 3) {
   const out = [];

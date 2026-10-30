@@ -309,35 +309,52 @@ const fbOf = (child) => {
 
 /** 한 아이의 앨범 사진을 판정. 얼굴 특징값은 faceMem(메모리)에서 가져온다 */
 function classifyKid(kid, mine, reports, strictness) {
-  const { refsFor, cohortStats, sampleCohort, decide, judge } = matchLib;
+  const { refsFor, cohortStats, sampleCohort, decide, judge, pickAutoRefs, SURE_MIN_PX } = matchLib;
   const th = decide(strictness);
   const fb = fbOf(kid.child);
   const allEmbs = mine.flatMap((j) => (faceMem.get(j.img.id) || []).map((f) => f.emb));
   const cohort = sampleCohort(allEmbs, 300);
-  const extra = [...fb.pos.values()].map((p) => ({ emb: p.emb, date: p.date }));
   const statCache = new Map();
   const withStat = (r) => {
     if (!statCache.has(r)) statCache.set(r, { emb: r.emb, stat: cohortStats(r.emb, cohort) });
     return statCache.get(r);
   };
   const neg = [...fb.neg.values()].map((n) => n.emb);
-  for (const j of mine) {
-    const faces = faceMem.get(j.img.id) || [];
-    const refs = [...refsFor(j.date, kid.refs), ...extra].map(withStat);
-    let best = { level: 0, z: -9, raw: 0, idx: -1 };
-    faces.forEach((f, i) => {
-      if (!f.stat) f.stat = cohortStats(f.emb, cohort);
-      const r = judge(f.emb, f.stat, refs, neg, th);
-      if (r.level > best.level || (r.level === best.level && r.z > best.z)) best = { ...r, idx: i };
+
+  const pass = (extra) => {
+    for (const j of mine) {
+      const faces = faceMem.get(j.img.id) || [];
+      const refs = [...refsFor(j.date, [...kid.refs, ...extra])].map(withStat);
+      let best = { level: 0, z: -9, raw: 0, idx: -1 };
+      faces.forEach((f, i) => {
+        if (!f.stat) f.stat = cohortStats(f.emb, cohort);
+        const r = judge(f.emb, f.stat, refs, neg, th);
+        if (r.level === 3 && f.size < SURE_MIN_PX) r.level = 1;
+        if (r.level > best.level || (r.level === best.level && r.z > best.z)) best = { ...r, idx: i };
+      });
+      // 사용자가 직접 고친 사진은 그대로 따른다
+      const key = `${kid.child}:${j.img.id}`;
+      if (fb.pos.has(key)) best.level = 3;
+      if (fb.neg.has(key)) best.level = 0;
+      j.level = best.level;
+      j.score = best.z;
+      j.raw = best.raw;
+      j.faceIdx = best.idx;
+    }
+  };
+
+  // 1차: 등록한 기준 얼굴 + 사용자가 "맞아요"라고 한 얼굴
+  const extra = [...fb.pos.values()].map((p) => ({ emb: p.emb, date: p.date }));
+  pass(extra);
+  // 2차: 1차에서 아주 확실했던 얼굴을 같은 시기 기준 얼굴로 더해 다시 판정 (사용자가 "아니에요"라고 한 사진은 제외)
+  const cands = mine
+    .filter((j) => j.level === 3 && j.faceIdx >= 0 && !fb.neg.has(`${kid.child}:${j.img.id}`))
+    .map((j) => {
+      const f = faceMem.get(j.img.id)[j.faceIdx];
+      return { emb: f.emb, size: f.size, date: j.date, z: j.score, raw: j.raw };
     });
-    // 사용자가 직접 고친 사진은 그대로 따른다
-    const key = `${kid.child}:${j.img.id}`;
-    if (fb.pos.has(key)) best.level = 3;
-    if (fb.neg.has(key)) best.level = 0;
-    j.level = best.level;
-    j.score = best.z;
-    j.faceIdx = best.idx;
-  }
+  const auto = pickAutoRefs(cands, th);
+  if (auto.length) pass([...extra, ...auto]);
   return {
     child: kid.child,
     name: kid.name,
