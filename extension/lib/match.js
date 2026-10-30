@@ -213,11 +213,13 @@ export function classifyPhotos(photos, refs, { pos = [], neg = [], forced = new 
 }
 
 /**
- * 이웃 비교 설정. n: 평균 낼 가장 닮은 얼굴 수, demote/promote: 비율 기준
- * (모의 앨범으로 고름: 0.92 에서 잘못 찾음 6~9%, 바로 찾음 86%. 0.94 부터는 우리 아이도 확인 필요로 많이 내려간다)
+ * 이웃 비교 설정. n: 평균 낼 가장 닮은 얼굴 수, demote/promote: 비율 기준, zMargin: "우리 아이"로 확정할 보정 점수 여유
  * 비율 = (기준 얼굴 중 가장 닮은 n개와의 유사도 평균) ÷ (앨범 속 다른 사진 얼굴 중 가장 닮은 n개와의 유사도 평균)
+ * 실제 사진 Y/N 249장(우리 아이 206, 다른 아이 43)으로 고름: 실제 아이는 모의 앨범보다 비율이 낮아(우리 아이 하위 10% 0.85)
+ * 비율 0.85 + 점수 여유 0.3 에서 "우리 아이" 170장 중 다른 아이 0장, 우리 아이의 82.5%를 바로 찾음
+ * (0.92 만 쓰면 다른 아이 0.9% 이지만 바로 찾음 55%, 1.0.1 방식은 다른 아이 11.9% · 바로 찾음 94%)
  */
-export const NEAR = { n: 3, demote: 0.92, promote: 0.97 };
+export const NEAR = { n: 3, demote: 0.85, promote: 0.97, zMargin: 0.3 };
 
 /**
  * 이웃 비교: "이 얼굴은 자기와 가장 닮은 앨범 속 얼굴들만큼 우리 아이 기준 얼굴과도 닮았나?"
@@ -262,6 +264,8 @@ export function checkNeighbors(photos, out, forced, th, scoreOf, refsOf) {
       const f = p.faces[c.faceIdx];
       const ratio = ratioOf(p, f);
       let level = c.level;
+      // 아슬아슬하게 기준을 넘은 얼굴은 확인 필요로 (실제 사진에서 다른 아이는 대개 기준 바로 위였다)
+      if (level === 3 && c.z < th.sure + NEAR.zMargin) level = 1;
       if (ratio != null) {
         if (level === 3 && ratio < NEAR.demote) level = 1;
         else if (level === 1 && ratio >= NEAR.promote && c.raw >= th.rawSure && f.size >= SURE_MIN_PX && (f.score ?? 1) >= SURE_MIN_SCORE) level = 3;
