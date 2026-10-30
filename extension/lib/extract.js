@@ -5,7 +5,7 @@
 const BULLET = /^\s*(?:[*\-•·▶▷►✔✓☑✅■□◆◇○●⭐★☆]|\d{1,2}[.)]|[①-⑳]|[가-하][.)])\s*/;
 const PREP_ANCHOR = /(준비물|챙겨\s*(?:주|보내)|챙길\s*것|지참)/;
 const DRESS_ANCHOR = /(복장|옷차림)/;
-const REQUEST = /(챙겨|보내\s*주|지참|가져\s*(?:와|오)|입혀\s*주|착용|신겨\s*주|준비해\s*주|넣어\s*주)/;
+const REQUEST = /(챙겨|보내\s*주|지참|가져\s*(?:와|오)|입혀\s*주|입고\s*(?:와|오|등원)|착용|신겨\s*주|준비해\s*주|넣어\s*주)/;
 const EVENT = /(견학|현장\s*학습|체험\s*학습|소풍|행사|공연|발표회|운동회|참관|휴원|방학|졸업|입학|생일\s*파티|축제|설명회|상담)/;
 const TIME = /(\d{1,2})\s*시(?:\s*(\d{1,2})\s*분)?\s*까지/;
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
@@ -77,7 +77,7 @@ function cleanItem(s) {
   return s
     .replace(/^\s*[*\-•·]+\s*/, '')
     .replace(BULLET, '')
-    .replace(/^[\s:：\-]+/, '')
+    .replace(/^[\s:：\-|]+/, '')
     .replace(/[⭐★☆✨❤️💕😊🙏]/gu, '')
     .replace(/\s+/g, ' ')
     .trim();
@@ -164,8 +164,11 @@ export function extractFromPost(post) {
 export function buildCards(posts) {
   const cards = [];
   for (const p of posts) {
-    const r = extractFromPost(p);
-    if (!r.prep.length && !r.events.length) continue;
+    // 그림 안내문(p.docImages)에서 읽은 글자(p.imgText)도 본문과 같이 살핀다
+    const r = extractFromPost({ ...p, content: [p.content, p.imgText].filter(Boolean).join('\n') });
+    const images = p.docImages || [];
+    // 챙길 것도 일정도 못 찾았어도 그림 안내문이 있으면 직접 볼 수 있게 카드로 남긴다
+    if (!r.prep.length && !r.events.length && !images.length) continue;
     cards.push({
       key: `${p.source}:${p.id}`,
       source: p.source,
@@ -173,11 +176,13 @@ export function buildCards(posts) {
       postDate: p.date,
       date: r.date || p.date,
       dateGuessed: !r.date,
-      title: p.title || bracketTitle(p.content) || shorten(r.events[0]) || firstLine(p.content),
+      title: p.title || bracketTitle(p.content) || shorten(r.events[0]) || firstLine(p.content) || firstLine(p.imgText) || '그림으로 온 안내',
       prep: r.prep,
       events: r.events,
       times: r.times,
       content: p.content,
+      images,
+      imgText: p.imgText || '',
     });
   }
   cards.sort((a, b) => a.date.localeCompare(b.date));
@@ -199,4 +204,33 @@ function shorten(s) {
 function firstLine(s = '') {
   const l = s.split(/\r?\n/).map((x) => x.trim()).find(Boolean) || '';
   return l.length > 40 ? l.slice(0, 40) + '…' : l;
+}
+
+/**
+ * 그림 안내문에서 읽은 글자 정리 (lib/ocr.js).
+ * - 표: "준비물      도시락, 물통" (짧은 이름 + 큰 빈칸) → "준비물: 도시락, 물통" 으로 바꿔 준비물 규칙이 알아듣게
+ * - 두 단: 왼쪽 글이 길면 큰 빈칸 뒤는 오른쪽 단으로 보고 왼쪽 단 다음에 이어 붙인다
+ * - 기호만 남은 줄(그림·테두리를 글자로 잘못 읽은 것)은 버린다
+ */
+const TABLE_LABEL = /^(?=.{1,8}$)[가-힣()\s]*[가-힣)](?<![요다])$/; // 일시, 장소, 준비물, 복장(남아) … 문장 끝(요·다)은 제외
+export function cleanOcrText(raw) {
+  const left = [], right = [];
+  for (const line of raw.replace(/＊/g, '*').split(/\r?\n/)) {
+    const parts = line.trim().split(/\s{4,}/).filter(Boolean);
+    if (!parts.length) continue;
+    if (parts.length === 1) left.push(parts[0]);
+    else if (TABLE_LABEL.test(parts[0])) left.push(`${parts[0]}: ${parts.slice(1).join(' ')}`);
+    else {
+      left.push(parts[0]);
+      right.push(...parts.slice(1));
+    }
+  }
+  return [...left, ...right]
+    // 줄 앞에 붙은 부스러기(홀로 된 자음·모음, 세로줄, 마침표 따위)는 떼어낸다. 불릿(* - · ※)은 남긴다
+    .map((l) => l.replace(/\s+/g, ' ').trim().replace(/^(?:[ㄱ-ㅎㅏ-ㅣ|。:;$>]+\s+)+/, ''))
+    .filter((l) => {
+      const ok = (l.match(/[가-힣0-9]/g) || []).length;
+      return ok >= 2 && ok >= l.replace(/\s/g, '').length * 0.5;
+    })
+    .join('\n');
 }

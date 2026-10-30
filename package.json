@@ -12,7 +12,9 @@
     "zip": "node scripts/zip.mjs"
   },
   "devDependencies": {
+    "@tesseract.js-data/kor": "1.0.0",
     "@vladmandic/human": "3.3.6",
-    "jszip": "^3.10.1"
+    "jszip": "^3.10.1",
+    "tesseract.js": "7.0.0"
   }
 }

@@ -83,6 +83,15 @@ select {
 mark { background: linear-gradient(transparent 55%, var(--mark) 55%, var(--mark) 95%, transparent 95%); color: inherit; padding: 0 1px; }
 
 /* ── 챙길 것 ── */
+.prep-bar { display: flex; align-items: baseline; gap: 12px; font-size: 13px; color: var(--soft); margin: 0 0 6px; }
+.prep-bar .linkbtn { float: none; margin-left: auto; }
+.ocr-status:not(:empty) { color: var(--pen); }
+.ocr-status:not(:empty)::before { content: '· '; color: var(--soft); }
+.doc-imgs { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+.doc-imgs a { display: block; border: 1px solid var(--rule); border-radius: 4px; overflow: hidden; }
+.doc-imgs a:hover { border-color: var(--pen); }
+.doc-imgs img { display: block; height: 120px; width: auto; max-width: 180px; object-fit: cover; object-position: top; }
+.ocr-note { font-size: 12px; margin: 6px 0 0; }
 .summary { font-size: 20px; font-weight: 700; margin: 0 0 4px; }
 .group-title { font-size: 13px; font-weight: 700; color: var(--soft); margin: 28px 0 0; padding-bottom: 8px; border-bottom: 1px solid var(--ink); }
 .group-title small { font-weight: 400; margin-left: 6px; }

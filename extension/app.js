@@ -149,7 +149,16 @@ function showTab(tab) {
 }
 
 // ───────────────────────── 챙길 것 ─────────────────────────
+// 그림으로 온 가정통신문·안내문은 브라우저 안에서 글자를 읽어(lib/ocr.js) 본문과 함께 살핀다.
+// 읽은 결과는 그림별로 저장해 두고(60일) 다시 읽지 않는다.
+const OCR_KEEP_DAYS = 60;
+const OCR_MAX_PER_POST = 6;
+// 알림장 그림은 대부분 아이 사진이라, 안내문을 붙였다는 말이 있거나 글이 짧을 때만 살핀다 (공지는 모두)
+const DOC_HINT = /통신문|안내문|안내장|첨부|신청서|동의서|식단|참고해?\s*주|확인해?\s*주/;
+const imgKey = (img) => String(img.id ?? (img.original || img.large || '').split('?')[0]);
+const hhmm = (d) => `${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}`;
 let prepRun = 0;
+let ocrJob = Promise.resolve(); // 지금 하고 있는 그림 읽기
 async function showPrep() {
   const run = ++prepRun;
   const list = selectedEnrollments();
@@ -165,10 +174,10 @@ async function showPrep() {
     for (const e of list) {
       const args = argsOf(e);
       for await (const r of paginate(api.reports, args, { stop: (x) => postYMD(x) < since, maxPages: 5 })) {
-        addPost(`report:${r.id}`, { id: r.id, source: 'report', date: postYMD(r), title: '', content: r.content || '' }, shortClass(e.class_name));
+        addPost(`report:${r.id}`, { id: r.id, source: 'report', date: postYMD(r), title: '', content: r.content || '', images: r.attached_images || [] }, shortClass(e.class_name));
       }
       for await (const n of paginate(api.notices, args, { stop: (x) => postYMD(x) < since, maxPages: 5 })) {
-        addPost(`notice:${n.id}`, { id: n.id, source: 'notice', date: postYMD(n), title: n.title || '', content: n.content || '' }, shortClass(e.class_name));
+        addPost(`notice:${n.id}`, { id: n.id, source: 'notice', date: postYMD(n), title: n.title || '', content: n.content || '', images: n.attached_images || [] }, shortClass(e.class_name));
       }
     }
   } catch (e) {
@@ -177,79 +186,155 @@ async function showPrep() {
   }
   if (currentTab !== 'prep' || run !== prepRun) return;
 
+  const loadedAt = new Date();
   const checked = await store.get(K.checked, {});
-  const cards = buildCards([...posts.values()]);
+  const ocr = await store.get(K.ocr, {}); // 그림 key → {at: 글 날짜, doc: 안내문이면 1, text: 읽은 글자}
+  const status = h('span', { class: 'ocr-status' });
   const t = today();
-  const upcoming = cards.filter((c) => c.date >= t);
-  const past = cards.filter((c) => c.date < t && daysBetween(c.date, t) <= 7).reverse();
-
-  const groups = [
-    ['오늘', (c) => c.date === t],
-    ['내일', (c) => daysBetween(t, c.date) === 1],
-    ['이번 주', (c) => { const d = daysBetween(t, c.date); return d >= 2 && d <= 7; }],
-    ['그 이후', (c) => daysBetween(t, c.date) > 7],
-  ];
-
-  const soonKeys = upcoming.filter((c) => daysBetween(t, c.date) <= 1).flatMap((c) => c.prep.map((_, i) => `${c.key}#${i}`));
-  const left = soonKeys.filter((k) => !checked[k]).length;
   const multi = list.length > 1;
-
   const save = () => store.set(K.checked, checked);
-  const cardView = (c, showDday = true) => {
-    const d = daysBetween(t, c.date);
-    const dday = d === 0 ? '오늘' : d === 1 ? '내일' : d > 0 ? `D-${d}` : `${-d}일 전`;
-    const keys = c.prep.map((_, i) => `${c.key}#${i}`);
-    const el = h('article', { class: 'card' + (keys.length && keys.every((k) => checked[k]) ? ' done' : '') },
-      h('div', { class: 'card-head' },
-        showDday ? h('span', { class: 'dday' }, dday) : null,
-        h('span', { class: 'date' }, dateLabel(c.date) + (c.dateGuessed ? ' · 글 작성일' : '')),
-        multi ? c.who.map((w) => h('span', { class: 'who' }, w)) : null,
-        h('span', { class: 'badge' }, c.source === 'notice' ? '공지' : '알림장'),
-      ),
-      c.title ? h('h3', {}, c.title) : null,
-      c.events.length && !c.events[0].includes(c.title.replace('…', '')) ? h('div', { class: 'event' }, c.events[0]) : null,
-      c.prep.length
-        ? h('ul', { class: 'items' }, c.prep.map((p, i) => {
-            const k = keys[i];
-            const li = h('li', { class: checked[k] ? 'checked' : '' },
-              h('input', {
-                type: 'checkbox', checked: !!checked[k], 'aria-label': p,
-                onchange: (ev) => {
-                  if (ev.target.checked) checked[k] = true;
-                  else delete checked[k];
-                  li.classList.toggle('checked', ev.target.checked);
-                  el.classList.toggle('done', keys.every((x) => checked[x]));
-                  save();
-                },
-              }),
-              h('span', {}, p),
-            );
-            return li;
-          }))
-        : null,
-      c.times.length ? h('div', { class: 'time' }, h('b', {}, '시간 '), c.times[0]) : null,
-      h('details', {}, h('summary', {}, '원문 보기'), h('div', { class: 'raw' }, c.content)),
-    );
-    return el;
-  };
 
-  const out = [];
-  out.push(h('p', { class: 'summary' },
-    left ? h('span', {}, '오늘·내일 챙길 것 ', h('mark', {}, `${left}개`), '가 남았어요')
-      : upcoming.length ? '오늘·내일 챙길 것은 모두 체크했어요' : '다가오는 준비물 안내가 없어요',
-  ));
-  for (const [name, fn] of groups) {
-    const g = upcoming.filter(fn);
-    if (!g.length) continue;
-    out.push(h('div', { class: 'group-title' }, name, h('small', {}, `${g.length}건`)));
-    g.forEach((c) => out.push(cardView(c, name !== '오늘' && name !== '내일')));
+  const draw = () => {
+    for (const p of posts.values()) {
+      p.docImages = p.images.filter((img) => ocr[imgKey(img)]?.doc);
+      p.imgText = p.docImages.map((img) => ocr[imgKey(img)].text).join('\n');
+    }
+    const cards = buildCards([...posts.values()]);
+    const upcoming = cards.filter((c) => c.date >= t);
+    const past = cards.filter((c) => c.date < t && daysBetween(c.date, t) <= 7).reverse();
+    // 챙길 것을 못 찾은 그림 안내문 카드는 "확인했어요" 하나로 체크
+    const keysOf = (c) => (c.prep.length ? c.prep.map((_, i) => `${c.key}#${i}`) : c.images.length ? [`${c.key}#img`] : []);
+
+    const groups = [
+      ['오늘', (c) => c.date === t],
+      ['내일', (c) => daysBetween(t, c.date) === 1],
+      ['이번 주', (c) => { const d = daysBetween(t, c.date); return d >= 2 && d <= 7; }],
+      ['그 이후', (c) => daysBetween(t, c.date) > 7],
+    ];
+
+    const soonKeys = upcoming.filter((c) => daysBetween(t, c.date) <= 1).flatMap(keysOf);
+    const left = soonKeys.filter((k) => !checked[k]).length;
+
+    const cardView = (c, showDday = true) => {
+      const d = daysBetween(t, c.date);
+      const dday = d === 0 ? '오늘' : d === 1 ? '내일' : d > 0 ? `D-${d}` : `${-d}일 전`;
+      const keys = keysOf(c);
+      const labels = c.prep.length ? c.prep : ['그림 안내문 확인했어요'];
+      const el = h('article', { class: 'card' + (keys.length && keys.every((k) => checked[k]) ? ' done' : '') },
+        h('div', { class: 'card-head' },
+          showDday ? h('span', { class: 'dday' }, dday) : null,
+          h('span', { class: 'date' }, dateLabel(c.date) + (c.dateGuessed ? ' · 글 작성일' : '')),
+          multi ? c.who.map((w) => h('span', { class: 'who' }, w)) : null,
+          h('span', { class: 'badge' }, c.source === 'notice' ? '공지' : '알림장'),
+          c.images.length ? h('span', { class: 'badge' }, '그림 안내문') : null,
+        ),
+        c.title ? h('h3', {}, c.title) : null,
+        c.events.length && !c.events[0].includes(c.title.replace('…', '')) ? h('div', { class: 'event' }, c.events[0]) : null,
+        keys.length
+          ? h('ul', { class: 'items' }, keys.map((k, i) => {
+              const li = h('li', { class: checked[k] ? 'checked' : '' },
+                h('input', {
+                  type: 'checkbox', checked: !!checked[k], 'aria-label': labels[i],
+                  onchange: (ev) => {
+                    if (ev.target.checked) checked[k] = true;
+                    else delete checked[k];
+                    li.classList.toggle('checked', ev.target.checked);
+                    el.classList.toggle('done', keys.every((x) => checked[x]));
+                    save();
+                  },
+                }),
+                h('span', {}, labels[i]),
+              );
+              return li;
+            }))
+          : null,
+        c.times.length ? h('div', { class: 'time' }, h('b', {}, '시간 '), c.times[0]) : null,
+        c.images.length
+          ? h('div', { class: 'doc-imgs' }, c.images.map((img) => h('a', { href: img.original || img.large, target: '_blank', rel: 'noopener', title: '크게 보기' },
+              h('img', { src: img.large || img.original, alt: '안내문 그림', loading: 'lazy' }))))
+          : null,
+        c.imgText && (c.prep.length || c.events.length)
+          ? h('p', { class: 'muted ocr-note' }, '그림에서 읽은 내용이 섞여 있어요. 글자를 잘못 읽었을 수 있으니 그림도 확인해 주세요.')
+          : null,
+        h('details', {}, h('summary', {}, '원문 보기'),
+          c.content.trim() ? h('div', { class: 'raw' }, c.content) : null,
+          c.imgText ? h('div', { class: 'raw' }, h('b', {}, '그림에서 읽은 글자'), '\n' + c.imgText) : null,
+        ),
+      );
+      return el;
+    };
+
+    const out = [];
+    out.push(h('div', { class: 'prep-bar' },
+      h('span', {}, `${hhmm(loadedAt)}에 확인`),
+      status,
+      h('button', { class: 'linkbtn', onclick: () => showPrep() }, '새로고침'),
+    ));
+    out.push(h('p', { class: 'summary' },
+      left ? h('span', {}, '오늘·내일 챙길 것 ', h('mark', {}, `${left}개`), '가 남았어요')
+        : upcoming.length ? '오늘·내일 챙길 것은 모두 체크했어요' : '다가오는 준비물 안내가 없어요',
+    ));
+    for (const [name, fn] of groups) {
+      const g = upcoming.filter(fn);
+      if (!g.length) continue;
+      out.push(h('div', { class: 'group-title' }, name, h('small', {}, `${g.length}건`)));
+      g.forEach((c) => out.push(cardView(c, name !== '오늘' && name !== '내일')));
+    }
+    if (past.length) {
+      out.push(h('details', { class: 'past' }, h('summary', {}, `지난 7일 안내 ${past.length}건`), past.map((c) => cardView(c))));
+    }
+    if (!cards.length) out.push(stateView('최근 30일 안에 챙길 것을 찾지 못했어요', '규칙으로 찾기 때문에 놓친 게 있을 수 있어요. 키즈노트 원문도 한 번 확인해 주세요.'));
+    out.push(h('p', { class: 'muted', style: 'margin-top:18px' }, '※ 문장 규칙으로 자동 추출한 결과예요. 그림으로 온 안내문도 글자를 읽어 살피지만, 중요한 안내는 원문을 꼭 확인해 주세요.'));
+    render(...out);
+  };
+  draw();
+
+  // 아직 안 읽은 그림 읽기 (이 컴퓨터 안에서만). 다 읽으면 안내문이 있을 때만 다시 그린다.
+  // 새로고침을 연달아 눌러도 앞의 읽기가 끝난 뒤 이어서 한다 (엔진은 하나)
+  const prev = ocrJob;
+  let release;
+  ocrJob = new Promise((r) => (release = r));
+  try {
+    await prev;
+    if (currentTab !== 'prep' || run !== prepRun) return;
+    Object.assign(ocr, await store.get(K.ocr, {})); // 앞에서 읽은 결과 반영
+    await readDocImages(run, posts, ocr, status, draw);
+  } finally {
+    release();
   }
-  if (past.length) {
-    out.push(h('details', { class: 'past' }, h('summary', {}, `지난 7일 안내 ${past.length}건`), past.map(cardView)));
+}
+
+async function readDocImages(run, posts, ocr, status, draw) {
+  const todo = new Map(); // 그림 key → {p, img}
+  for (const p of posts.values()) {
+    if (p.source === 'report' && !DOC_HINT.test(p.content) && p.content.trim().length >= 80) continue;
+    for (const img of p.images.slice(0, OCR_MAX_PER_POST)) {
+      const k = imgKey(img);
+      if (!(k in ocr) && !todo.has(k)) todo.set(k, { p, img });
+    }
   }
-  if (!cards.length) out.push(stateView('최근 30일 안에 챙길 것을 찾지 못했어요', '규칙으로 찾기 때문에 놓친 게 있을 수 있어요. 키즈노트 원문도 한 번 확인해 주세요.'));
-  out.push(h('p', { class: 'muted', style: 'margin-top:18px' }, '※ 문장 규칙으로 자동 추출한 결과예요. 중요한 안내는 원문을 꼭 확인해 주세요.'));
-  render(...out);
+  if (!todo.size) return;
+  const { readImage, closeOcr } = await import('./lib/ocr.js'); // 필요할 때만 엔진을 불러온다
+  let found = 0, i = 0;
+  try {
+    for (const [k, { p, img }] of todo) {
+      if (currentTab !== 'prep' || run !== prepRun) break;
+      status.textContent = `그림 안내문 확인 중 ${++i}/${todo.size}`;
+      try {
+        const r = await readImage(img.original || img.large);
+        ocr[k] = r.doc ? { at: p.date, doc: 1, text: r.text } : { at: p.date };
+        if (r.doc) found++;
+      } catch { /* 받지 못한 그림은 다음에 다시 */ }
+    }
+  } finally {
+    await closeOcr();
+  }
+  const cut = cutoffYMD(OCR_KEEP_DAYS);
+  for (const [k, v] of Object.entries(ocr)) if (v.at < cut) delete ocr[k];
+  await store.set(K.ocr, ocr);
+  if (currentTab !== 'prep' || run !== prepRun) return;
+  status.textContent = '';
+  if (found) draw();
 }
 
 // ───────────────────────── 우리 애 사진 ─────────────────────────

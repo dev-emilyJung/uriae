@@ -24,3 +24,12 @@ This product bundles the following third-party software:
 3. JSZip (extension/vendor/jszip.min.js)
    https://github.com/Stuk/jszip
    License: MIT or GPLv3 (dual). Used here under the MIT license.
+
+5. tesseract.js 7.0.0 and tesseract.js-core (extension/vendor/ocr/*.js)
+   https://github.com/naptha/tesseract.js
+   License: Apache-2.0. Default CDN addresses were removed from the bundled copies
+   (scripts/vendor.mjs); every file loads from inside the extension.
+
+6. Tesseract Korean language data, 4.0.0_best_int (extension/vendor/ocr/kor.traineddata.gz)
+   https://github.com/tesseract-ocr/tessdata_best via @tesseract.js-data/kor
+   License: Apache-2.0

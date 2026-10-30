@@ -20,4 +20,5 @@ export const K = {
   refs: (child) => `refs:${child}`, // 아이별 기준 얼굴 임베딩 [{id, emb:number[], thumb}]
   scores: (child) => `scores2:${child}`, // 아이별 사진 얼굴 점수 {sig: 기준얼굴 id 목록, map: {imageId: [얼굴별 점수]}}
   strictness: 'strictness', // 0(많이 찾기) ~ 1(정확하게)
+  ocr: 'ocr1', // 그림 안내문에서 읽은 글자 {그림 key: {at, doc, text}} (60일 보관)
 };
