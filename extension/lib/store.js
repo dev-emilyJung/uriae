@@ -17,7 +17,8 @@ export const K = {
   kid: 'currentKid', // 지금 보고 있는 아이
   selected: 'selectedClasses', // 선택한 반(소속 id) 목록. 없으면 전체 선택
   checked: 'checked', // 챙김 체크 상태 {itemKey: true}
-  hidden: 'hiddenCards', // 숨긴 안내 카드 {cardKey: 안내 날짜} (60일 지나면 정리)
+  hidden: 'hiddenCards', // "해당 없음"으로 지운 안내 카드 {cardKey: 안내 날짜} (60일 지나면 정리)
+  prepView: 'prepView', // 챙길 것 보기 방식 'list' | 'cal'
   refs: (child) => `refs:${child}`, // 아이별 기준 얼굴 임베딩 [{id, emb:number[], thumb}]
   scores: (child) => `scores2:${child}`, // 아이별 사진 얼굴 점수 {sig: 기준얼굴 id 목록, map: {imageId: [얼굴별 점수]}}
   strictness: 'strictness', // 0(많이 찾기) ~ 1(정확하게)

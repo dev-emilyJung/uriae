@@ -85,6 +85,23 @@ mark { background: linear-gradient(transparent 55%, var(--mark) 55%, var(--mark)
 /* ── 챙길 것 ── */
 .prep-bar { display: flex; align-items: baseline; gap: 12px; font-size: 13px; color: var(--soft); margin: 0 0 6px; }
 .prep-bar .linkbtn { float: none; margin-left: auto; }
+.prep-bar .view-switch { margin-left: auto; display: inline-flex; gap: 10px; }
+.prep-bar .view-switch .linkbtn { margin: 0; color: var(--soft); font-weight: 400; }
+.prep-bar .view-switch .linkbtn[aria-pressed="true"] { color: var(--ink); font-weight: 700; }
+.prep-bar .view-switch + .linkbtn { margin-left: 4px; padding-left: 12px; border-left: 1px solid var(--rule); }
+.cal-nav { display: flex; align-items: center; justify-content: space-between; margin: 18px 0 8px; }
+.cal-nav .linkbtn { float: none; }
+.cal { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); border-top: 1px solid var(--ink); border-left: 1px solid var(--rule); }
+.cal-w { font-size: 12px; color: var(--soft); text-align: center; padding: 6px 0; border-right: 1px solid var(--rule); border-bottom: 1px solid var(--rule); }
+.cal-cell { display: flex; flex-direction: column; align-items: stretch; gap: 2px; min-height: 76px; padding: 4px 5px; border: 0; border-right: 1px solid var(--rule); border-bottom: 1px solid var(--rule); background: none; text-align: left; overflow: hidden; }
+.cal-cell.empty { background: var(--wash); }
+.cal-cell:hover { background: var(--wash); }
+.cal-cell.sel { box-shadow: inset 0 0 0 2px var(--pen); }
+.cal-d { font-size: 12px; color: var(--soft); }
+.cal-cell.today .cal-d { color: var(--pen); font-weight: 700; }
+.cal-item { font-size: 12px; line-height: 1.35; padding: 1px 4px; border-radius: 3px; background: var(--mark); color: #222; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cal-item.done { background: none; color: var(--faint); text-decoration: line-through; padding-left: 0; }
+.cal-more { font-size: 11px; color: var(--soft); }
 .ocr-status:not(:empty) { color: var(--pen); }
 .ocr-status:not(:empty)::before { content: '· '; color: var(--soft); }
 .doc-imgs { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
@@ -107,6 +124,11 @@ mark { background: linear-gradient(transparent 55%, var(--mark) 55%, var(--mark)
 .items li { display: flex; gap: 10px; align-items: flex-start; padding: 5px 0; }
 .items input { width: 17px; height: 17px; margin: 3px 0 0; accent-color: var(--pen); flex: none; }
 .items li.checked span { text-decoration: line-through; color: var(--faint); }
+.items li.na span { text-decoration: line-through; color: var(--faint); }
+.items li .na-btn { float: none; margin-left: auto; color: var(--faint); font-weight: 400; font-size: 12px; white-space: nowrap; }
+.items li:hover .na-btn { color: var(--soft); }
+.card.na h3, .card.na .event, .card.na .items span, .card.na .time { text-decoration: line-through; color: var(--faint); }
+.card.na .doc-imgs, .card.na details, .card.na .items input { display: none; }
 .time { font-size: 14px; margin-top: 6px; }
 details { margin-top: 8px; }
 summary { color: var(--soft); font-size: 13px; cursor: pointer; width: fit-content; }
@@ -217,6 +239,10 @@ body.noscroll { overflow: hidden; }
   .period { grid-template-columns: 1fr auto; }
   .period .refs { grid-column: 1 / -1; grid-row: 3; margin-top: 6px; }
   .period .btn { grid-column: 2; }
+  /* 좁은 화면 달력은 날짜와 점만, 내용은 아래 카드로 */
+  .cal-cell { min-height: 44px; align-items: center; }
+  .cal-item, .cal-more { display: none; }
+  .cal-cell.has::after { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--pen); }
 }
 .diag { font-size: 12px; color: var(--faint); margin-top: 2px; }
 

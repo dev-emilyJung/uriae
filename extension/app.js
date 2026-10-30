@@ -187,7 +187,8 @@ async function showPrep() {
 
   const loadedAt = new Date();
   const checked = await store.get(K.checked, {});
-  const hidden = await store.get(K.hidden, {}); // 읽고 필요 없다고 숨긴 카드
+  const hidden = await store.get(K.hidden, {}); // "해당 없음"으로 지운 카드
+  const justHidden = new Set(); // 이번에 지운 카드는 그 자리에 취소선으로 두고, 다음에 열 때 아래로 접는다
   const old = cutoffYMD(60);
   for (const [k, d] of Object.entries(hidden)) if (d < old) delete hidden[k];
   const ocr = await store.get(K.ocr, {}); // 그림 key → {at: 글 날짜, doc: 안내문이면 1, text: 읽은 글자}
@@ -195,6 +196,8 @@ async function showPrep() {
   const t = today();
   const multi = list.length > 1;
   const save = () => store.set(K.checked, checked);
+  let view = await store.get(K.prepView, 'list'); // 'list' | 'cal'
+  let calMonth = t.slice(0, 7), calDay = t;
 
   const draw = () => {
     for (const p of posts.values()) {
@@ -206,10 +209,10 @@ async function showPrep() {
         .join('\n');
     }
     const all = buildCards([...posts.values()]);
-    const cards = all.filter((c) => !hidden[c.key]);
-    const hiddenCards = all.filter((c) => hidden[c.key]);
+    const cards = all.filter((c) => !hidden[c.key] || justHidden.has(c.key));
+    const hiddenCards = all.filter((c) => hidden[c.key] && !justHidden.has(c.key));
     const setHidden = (c, on) => {
-      if (on) hidden[c.key] = c.date;
+      if (on) { hidden[c.key] = c.date; justHidden.add(c.key); }
       else delete hidden[c.key];
       store.set(K.hidden, hidden);
       draw();
@@ -218,6 +221,13 @@ async function showPrep() {
     const past = cards.filter((c) => c.date < t && daysBetween(c.date, t) <= 7).reverse();
     // 챙길 것을 못 찾은 그림 안내문 카드는 "확인했어요" 하나로 체크
     const keysOf = (c) => (c.prep.length ? c.prep.map((_, i) => `${c.key}#${i}`) : c.images.length ? [`${c.key}#img`] : []);
+    // checked[k]: true(챙김) | 'na'(우리 아이와 해당 없음). 둘 다 남은 개수에서 빠진다
+    const setNa = (k, on) => {
+      if (on) checked[k] = 'na';
+      else delete checked[k];
+      save();
+      draw();
+    };
 
     const groups = [
       ['오늘', (c) => c.date === t],
@@ -226,7 +236,7 @@ async function showPrep() {
       ['그 이후', (c) => daysBetween(t, c.date) > 7],
     ];
 
-    const soonKeys = upcoming.filter((c) => daysBetween(t, c.date) <= 1).flatMap(keysOf);
+    const soonKeys = upcoming.filter((c) => !hidden[c.key] && daysBetween(t, c.date) <= 1).flatMap(keysOf);
     const left = soonKeys.filter((k) => !checked[k]).length;
 
     const cardView = (c, showDday = true) => {
@@ -234,7 +244,7 @@ async function showPrep() {
       const dday = d === 0 ? '오늘' : d === 1 ? '내일' : d > 0 ? `D-${d}` : `${-d}일 전`;
       const keys = keysOf(c);
       const labels = c.prep.length ? c.prep : ['그림 안내문 확인했어요'];
-      const el = h('article', { class: 'card' + (keys.length && keys.every((k) => checked[k]) ? ' done' : '') },
+      const el = h('article', { class: 'card' + (hidden[c.key] ? ' na' : keys.length && keys.every((k) => checked[k]) ? ' done' : '') },
         h('div', { class: 'card-head' },
           showDday ? h('span', { class: 'dday' }, dday) : null,
           h('span', { class: 'date' }, dateLabel(c.date) + (c.dateGuessed ? ' · 글 작성일' : '')),
@@ -242,25 +252,30 @@ async function showPrep() {
           h('span', { class: 'badge' }, c.source === 'notice' ? '공지' : '알림장'),
           c.images.length ? h('span', { class: 'badge' }, '그림 안내문') : null,
           hidden[c.key]
-            ? h('button', { class: 'linkbtn hide-btn', onclick: () => setHidden(c, false) }, '다시 보기')
-            : h('button', { class: 'linkbtn hide-btn', title: '필요 없는 안내는 목록에서 숨겨요', onclick: () => setHidden(c, true) }, '숨기기'),
+            ? h('button', { class: 'linkbtn hide-btn', onclick: () => setHidden(c, false) }, '되돌리기')
+            : h('button', { class: 'linkbtn hide-btn', title: '우리 아이와 상관없는 안내는 지워요. 다음부터는 맨 아래에 접혀 있어요', onclick: () => setHidden(c, true) }, '해당 없음'),
         ),
         c.title ? h('h3', {}, c.title) : null,
         c.events.length && !c.events[0].includes(c.title.replace('…', '')) ? h('div', { class: 'event' }, c.events[0]) : null,
         keys.length
           ? h('ul', { class: 'items' }, keys.map((k, i) => {
-              const li = h('li', { class: checked[k] ? 'checked' : '' },
+              const na = checked[k] === 'na';
+              const li = h('li', { class: na ? 'na' : checked[k] ? 'checked' : '' },
                 h('input', {
-                  type: 'checkbox', checked: !!checked[k], 'aria-label': labels[i],
+                  type: 'checkbox', checked: checked[k] === true, disabled: na, 'aria-label': labels[i],
                   onchange: (ev) => {
                     if (ev.target.checked) checked[k] = true;
                     else delete checked[k];
                     li.classList.toggle('checked', ev.target.checked);
-                    el.classList.toggle('done', keys.every((x) => checked[x]));
+                    el.classList.toggle('done', !hidden[c.key] && keys.every((x) => checked[x]));
                     save();
                   },
                 }),
                 h('span', {}, labels[i]),
+                // 준비물 줄마다 "해당 없음" (예: 남아만, 신청한 아이만). 카드가 하나뿐이면 카드의 해당 없음으로 충분
+                keys.length > 1 && !hidden[c.key]
+                  ? h('button', { class: 'linkbtn na-btn', onclick: () => setNa(k, !na) }, na ? '되돌리기' : '해당 없음')
+                  : null,
               );
               return li;
             }))
@@ -281,27 +296,77 @@ async function showPrep() {
       return el;
     };
 
+    // 달력: 날짜 칸에 안내 제목을 보여주고, 날짜를 누르면 그날 카드를 아래에 펼친다
+    const calendarView = () => {
+      const byDate = new Map();
+      for (const c of cards) {
+        if (!byDate.has(c.date)) byDate.set(c.date, []);
+        byDate.get(c.date).push(c);
+      }
+      const [y, m] = calMonth.split('-').map(Number);
+      const lead = new Date(Date.UTC(y, m - 1, 1)).getUTCDay();
+      const days = new Date(Date.UTC(y, m, 0)).getUTCDate();
+      const doneOf = (c) => hidden[c.key] || (keysOf(c).length && keysOf(c).every((k) => checked[k]));
+      const cells = Array.from({ length: lead }, () => h('div', { class: 'cal-cell empty' }));
+      for (let d = 1; d <= days; d++) {
+        const key = `${calMonth}-${String(d).padStart(2, '0')}`;
+        const cs = byDate.get(key) || [];
+        cells.push(h('button', {
+          class: 'cal-cell' + (key === t ? ' today' : '') + (key === calDay ? ' sel' : '') + (cs.length ? ' has' : ''),
+          'aria-label': `${m}월 ${d}일 안내 ${cs.length}건`,
+          onclick: () => { calDay = key; draw(); },
+        },
+        h('span', { class: 'cal-d' }, d),
+        cs.slice(0, 2).map((c) => h('span', { class: 'cal-item' + (doneOf(c) ? ' done' : '') }, c.title || c.events[0] || c.prep.join(', ') || '안내')),
+        cs.length > 2 ? h('span', { class: 'cal-more' }, `+${cs.length - 2}`) : null));
+      }
+      const shift = (n) => {
+        calMonth = new Date(Date.UTC(y, m - 1 + n, 1)).toISOString().slice(0, 7);
+        draw();
+      };
+      const sel = byDate.get(calDay) || [];
+      return [
+        h('div', { class: 'cal-nav' },
+          h('button', { class: 'linkbtn', onclick: () => shift(-1) }, '‹ 이전 달'),
+          h('b', {}, `${y}년 ${m}월`),
+          h('button', { class: 'linkbtn', onclick: () => shift(1) }, '다음 달 ›')),
+        h('div', { class: 'cal' }, WEEK.map((w) => h('div', { class: 'cal-w' }, w)), cells),
+        h('div', { class: 'group-title' }, dateLabel(calDay), h('small', {}, `${sel.length}건`)),
+        sel.length ? sel.map((c) => cardView(c)) : h('p', { class: 'muted' }, '이 날 안내가 없어요.'),
+      ];
+    };
+    const setView = (v) => {
+      view = v;
+      store.set(K.prepView, v);
+      draw();
+    };
+
     const out = [];
     out.push(h('div', { class: 'prep-bar' },
       h('span', {}, `${hhmm(loadedAt)}에 확인`),
       status,
+      h('span', { class: 'view-switch', role: 'group', 'aria-label': '보기 방식' },
+        h('button', { class: 'linkbtn', 'aria-pressed': String(view === 'list'), onclick: () => setView('list') }, '목록'),
+        h('button', { class: 'linkbtn', 'aria-pressed': String(view === 'cal'), onclick: () => setView('cal') }, '달력')),
       h('button', { class: 'linkbtn', onclick: () => showPrep() }, '새로고침'),
     ));
     out.push(h('p', { class: 'summary' },
       left ? h('span', {}, '오늘·내일 챙길 것 ', h('mark', {}, `${left}개`), '가 남았어요')
         : upcoming.length ? '오늘·내일 챙길 것은 모두 체크했어요' : '다가오는 준비물 안내가 없어요',
     ));
-    for (const [name, fn] of groups) {
+    if (view === 'cal') {
+      out.push(...calendarView());
+    } else for (const [name, fn] of groups) {
       const g = upcoming.filter(fn);
       if (!g.length) continue;
       out.push(h('div', { class: 'group-title' }, name, h('small', {}, `${g.length}건`)));
       g.forEach((c) => out.push(cardView(c, name !== '오늘' && name !== '내일')));
     }
-    if (past.length) {
+    if (view === 'list' && past.length) {
       out.push(h('details', { class: 'past' }, h('summary', {}, `지난 7일 안내 ${past.length}건`), past.map((c) => cardView(c))));
     }
     if (hiddenCards.length) {
-      out.push(h('details', { class: 'past' }, h('summary', {}, `숨긴 안내 ${hiddenCards.length}건`), hiddenCards.map((c) => cardView(c))));
+      out.push(h('details', { class: 'past' }, h('summary', {}, `해당 없는 안내 ${hiddenCards.length}건`), hiddenCards.map((c) => cardView(c))));
     }
     if (!cards.length) out.push(stateView('최근 30일 안에 챙길 것을 찾지 못했어요', '규칙으로 찾기 때문에 놓친 게 있을 수 있어요. 키즈노트 원문도 한 번 확인해 주세요.'));
     out.push(h('p', { class: 'muted', style: 'margin-top:18px' }, '※ 문장 규칙으로 자동 추출한 결과예요. 그림으로 온 안내문도 글자를 읽어 살피지만, 중요한 안내는 원문을 꼭 확인해 주세요.'));
