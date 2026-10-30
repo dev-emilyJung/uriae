@@ -4,41 +4,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
-import { extractFromPost } from '../extension/lib/extract.js';
+import { score } from './prep-score.mjs';
 
 const CASES = new URL('./private/prep-cases.json', import.meta.url);
 const BASELINE = new URL('./private/prep-baseline.json', import.meta.url);
-const norm = (s) => s.replace(/[\s.,·()[\]~!*\-•:]/g, '');
-const same = (a, b) => {
-  const x = norm(a), y = norm(b);
-  return x === y || (x.length >= 2 && y.length >= 2 && (x.includes(y) || y.includes(x)));
-};
-
-export function score(cases) {
-  let tp = 0, fp = 0, fn = 0, dateOk = 0;
-  const fails = [];
-  for (const c of cases) {
-    const r = extractFromPost({ ...c, content: [c.content, c.imgText].filter(Boolean).join('\n') });
-    const want = [...c.expect.prep];
-    const wrong = [];
-    for (const got of r.prep) {
-      const i = want.findIndex((w) => same(got, w));
-      if (i >= 0) { tp++; want.splice(i, 1); } else { fp++; wrong.push(got); }
-    }
-    fn += want.length;
-    const dOk = (r.date || null) === (c.expect.date || null);
-    if (dOk) dateOk++;
-    if (wrong.length || want.length || !dOk) fails.push({ key: c.key, wrong, missed: want, date: dOk ? null : `${r.date} → 정답 ${c.expect.date}` });
-  }
-  return {
-    cases: cases.length,
-    precision: tp + fp ? tp / (tp + fp) : 1,
-    recall: tp + fn ? tp / (tp + fn) : 1,
-    date: cases.length ? dateOk / cases.length : 1,
-    fails,
-  };
-}
-
 test('실제 알림장 정답 채점', { skip: !existsSync(CASES) && '정답 파일 없음 (tests/private/prep-cases.json)' }, () => {
   const { cases } = JSON.parse(readFileSync(CASES, 'utf8'));
   const s = score(cases);

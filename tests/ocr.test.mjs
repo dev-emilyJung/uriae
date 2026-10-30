@@ -7,11 +7,14 @@ import { cleanOcrText, extractFromPost, fixOcrLine, isReferenceDoc, isReadable }
 const RAW = JSON.parse(readFileSync(new URL('./ocr-raw.json', import.meta.url), 'utf8'));
 const read = (raw) => extractFromPost({ id: 1, source: 'notice', date: '2026-10-28', content: cleanOcrText(raw) });
 
-test('표로 된 가정통신문: 준비물·복장·날짜', () => {
+test('표로 된 가정통신문: 준비물·복장은 행사일, 동의서는 마감일', () => {
   for (const raw of [RAW.notice, RAW.photo]) {
     const r = read(raw);
     assert.deepEqual(r.prep.slice(0, 5), ['도시락', '물통', '여벌옷', '모자', '편한 운동화와 활동복']);
-    assert.equal(r.date, '2026-11-05');
+    assert.deepEqual(r.dates.slice(0, 5), Array(5).fill('2026-11-05'));
+    const consent = r.prep.findIndex((x) => x.includes('동의서'));
+    assert.equal(r.dates[consent], '2026-11-03');
+    assert.equal(r.date, '2026-11-03'); // 가장 이른 날
   }
 });
 
