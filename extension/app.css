@@ -137,6 +137,21 @@ summary { color: var(--soft); font-size: 13px; cursor: pointer; width: fit-conte
 
 /* ── 우리 애 사진 ── */
 .toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
+.toolbar .manage-btn { margin-left: auto; }
+/* 사진 찾기 준비 단계: ① 얼굴 고르기 → ② 사진 찾기 */
+.steps { display: flex; gap: 10px; list-style: none; margin: 0 0 22px; padding: 0; }
+.steps li { flex: 1; display: flex; flex-direction: column; gap: 2px; padding: 12px 14px; border: 1px solid var(--rule); border-radius: 6px; color: var(--soft); font-size: 13px; }
+.steps li b { font-size: 15px; color: var(--soft); }
+.steps li.on { border-color: var(--pen); box-shadow: inset 0 0 0 1px var(--pen); }
+.steps li.on b { color: var(--pen); }
+/* 접어 둔 목록: 누르는 버튼처럼 보이게 (펼치기 ▾ / 접기 ▴) */
+details.fold { margin-top: 14px; }
+details.fold > summary { list-style: none; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; width: 100%; box-sizing: border-box; padding: 11px 14px; border: 1px solid var(--rule); border-radius: 6px; background: var(--wash); color: var(--ink); font-size: 14px; font-weight: 600; }
+details.fold > summary::-webkit-details-marker { display: none; }
+details.fold > summary small { font-weight: 400; color: var(--soft); font-size: 13px; }
+details.fold > summary::after { content: '펼치기 ▾'; margin-left: auto; color: var(--pen); font-size: 13px; }
+details.fold[open] > summary::after { content: '접기 ▴'; }
+details.fold > summary:hover { border-color: var(--soft); }
 .progress { height: 3px; background: var(--rule); overflow: hidden; margin: 12px 0 4px; }
 .progress > div { height: 100%; width: 0; background: var(--pen); transition: width 0.2s; }
 .section-label { font-weight: 700; margin: 28px 0 0; padding-bottom: 8px; border-bottom: 1px solid var(--ink); }

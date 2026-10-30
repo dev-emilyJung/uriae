@@ -468,10 +468,8 @@ async function showPhotos(flash = '') {
     for (const o of everyone) if (o.child !== k.child) k.others.push(...(await store.get(K.refs(o.child), [])));
     (k.refs.length >= REF_MIN ? withRefs : noRefs).push(k);
   }
-  if (!withRefs.length) {
-    return render(stateView(`먼저 아이 얼굴을 ${REF_MIN}개 이상 등록해 주세요`, `최근 사진 속 우리 아이 얼굴을 ${REF_GOAL}개 정도 고르면 가장 정확해요. 알림장 사진 속 얼굴을 눌러서 고를 수 있어요.`,
-      h('button', { class: 'btn', onclick: () => showTab('faces') }, '기준 얼굴 등록하기')));
-  }
+  // 기준 얼굴이 부족하면 사진 찾기 대신 ① 얼굴 고르기 단계를 바로 보여준다
+  if (!withRefs.length) return showFaces();
   // 최근 기간 + 예전 1년 단위. 한 번에 최대 1년치만 찾는다 (사진을 한 장씩 살펴보므로 길면 몇 시간이 걸리고 서버에도 부담)
   const ranges = searchRanges(today(), withRefs[0].periods, !!withRefs[0].birth);
   const period = h('select', { 'aria-label': '기간' },
@@ -486,7 +484,7 @@ async function showPhotos(flash = '') {
     `예전 반과 다른 기관 사진까지, 반과 상관없이 ${withRefs.map((k) => givenName(k.name)).join(', ')}의 사진을 찾아요.`);
   const warn = noRefs.length
     ? h('div', { class: 'muted', style: 'margin-top:4px' }, `${noRefs.map((k) => givenName(k.name)).join(', ')}는 기준 얼굴이 부족해서 이번엔 빠져요. `,
-        h('a', { href: '#', onclick: (ev) => { ev.preventDefault(); showTab('faces'); } }, '등록하기'))
+        h('a', { href: '#', onclick: (ev) => { ev.preventDefault(); showFaces(); } }, '등록하기'))
     : null;
   // 고른 기간 안에 기준 얼굴이 부족한 시기가 있으면, 찾기 전에 그 시기 얼굴을 고르도록 안내한다
   const gaps = h('div');
@@ -504,7 +502,7 @@ async function showPhotos(flash = '') {
           class: 'btn ghost small',
           onclick: () => showPicker(k, p, (msg) => showPhotos(msg)),
         }, `${withRefs.length > 1 ? givenName(k.name) + ' ' : ''}${p.label} 고르기`)),
-        rows.length > 4 ? h('a', { href: '#', onclick: (ev) => { ev.preventDefault(); showTab('faces'); } }, `외 ${rows.length - 4}개 시기`) : null),
+        rows.length > 4 ? h('a', { href: '#', onclick: (ev) => { ev.preventDefault(); showFaces(); } }, `외 ${rows.length - 4}개 시기`) : null),
       ) : null,
       long ? h('div', { class: 'muted', style: 'margin-top:4px' }, '사진을 한 장씩 살펴보기 때문에 오래 걸릴 수 있어요. 중간에 멈추면 그때까지 찾은 결과를 보여드려요.') : null,
     ].filter(Boolean));
@@ -514,7 +512,8 @@ async function showPhotos(flash = '') {
   const bar = h('div', { class: 'progress', hidden: true }, h('div'));
   const results = h('div');
   runBtn.onclick = () => runSearch(range(), withRefs, { runBtn, stopBtn, status, bar, results });
-  render(h('div', { class: 'toolbar' }, period, runBtn, stopBtn), status, warn, gaps, bar, results);
+  const manage = h('button', { class: 'btn ghost small manage-btn', onclick: () => showFaces() }, '기준 얼굴 관리');
+  render(h('div', { class: 'toolbar' }, period, runBtn, stopBtn, manage), status, warn, gaps, bar, results);
   if (photoState && photoState.sig === selSig()) drawResults(results);
 }
 
@@ -1083,16 +1082,27 @@ async function showFaces(flash = '') {
   const shown = periods.filter((p, i) => i === 0 || refs.some((r) => inPeriod(r, p)));
   const folded = periods.filter((p) => !shown.includes(p));
   const first = !refs.length;
+  const ready = refs.length >= REF_MIN; // 사진을 찾을 수 있는 상태
+
+  // 기준 얼굴은 "우리 애 사진"의 준비 단계: 준비 전에는 단계 안내, 준비되면 사진 찾기로 가는 버튼
+  const head = ready
+    ? h('div', { class: 'toolbar' },
+        h('button', { class: 'btn', onclick: () => showPhotos() }, '사진 찾으러 가기 →'),
+        h('span', { class: 'muted' }, '기준 얼굴을 더하거나 지우고 돌아가면 바로 반영돼요'))
+    : h('ol', { class: 'steps' },
+        h('li', { class: 'on' }, h('b', {}, '① 우리 아이 얼굴 고르기'), h('span', {}, `최근 사진에서 ${REF_GOAL}개 정도`)),
+        h('li', {}, h('b', {}, '② 사진 찾기'), h('span', {}, '얼굴이 2개 이상이면 시작할 수 있어요')));
 
   render(
+    head,
     h('section', { class: 'panel' },
       h('h2', {}, `${kid.name}의 기준 얼굴`),
       h('p', { class: 'muted' }, first
-        ? `처음이라면 가장 최근 시기에서 우리 아이 얼굴을 ${REF_GOAL}개 정도 골라 주세요. ${REF_MIN}개만 있어도 바로 사진을 찾을 수 있어요.`
+        ? `가장 최근 시기에서 우리 아이 얼굴을 ${REF_GOAL}개 정도 골라 주세요. ${REF_MIN}개만 있어도 바로 사진을 찾을 수 있어요.`
         : `아이 얼굴은 금방 바뀌어서, 시기마다 ${REF_GOAL}개 정도 있으면 가장 정확해요. 사진을 찾을 때는 그 사진 날짜와 가까운 시기의 얼굴로 비교해요.`),
       h('div', { class: 'periods' }, shown.map(periodRow)),
-      folded.length ? h('details', { class: 'past' },
-        h('summary', {}, `예전 시기 ${folded.length}개 · 옛날 사진도 찾으려면 그때 얼굴을 골라 주세요`),
+      folded.length ? h('details', { class: 'fold' },
+        h('summary', {}, h('span', {}, `예전 시기 ${folded.length}개`), h('small', {}, '옛날 사진도 찾으려면 그때 얼굴을 골라 주세요')),
         h('div', { class: 'periods' }, folded.map(periodRow))) : null,
       undated.length ? h('div', {}, h('div', { class: 'section-label' }, '날짜 없는 기준 얼굴', h('small', {}, '예전 버전에서 등록한 얼굴')), h('div', { class: 'refs' }, undated.map(refChip))) : null,
       h('div', { class: 'toolbar', style: 'margin-top:12px' },
@@ -1101,12 +1111,13 @@ async function showFaces(flash = '') {
       ),
       msg,
     ),
-    h('section', { class: 'panel' },
+    // 찾는 기준·데이터 지우기는 처음 고를 때는 숨긴다 (화면을 단순하게)
+    !ready ? null : h('section', { class: 'panel' },
       h('h2', {}, '찾는 기준'),
       h('div', { class: 'slider' }, h('span', { class: 'muted' }, '많이 찾기'), slider, h('span', { class: 'muted' }, '정확하게')),
       h('p', { class: 'muted' }, '다른 아이가 섞이면 정확하게 쪽으로, 놓치는 사진이 많으면 많이 찾기 쪽으로 옮겨 보세요. 애매한 사진은 "확인이 필요해요"에 따로 모아 보여드려요.'),
     ),
-    h('section', { class: 'panel' },
+    !ready ? null : h('section', { class: 'panel' },
       h('h2', {}, '내 데이터'),
       h('p', { class: 'muted' }, '기준 얼굴과 사진 점수는 이 브라우저에만 저장돼요. 다른 아이들의 얼굴 정보는 비교 직후 버려지고 저장되지 않아요.'),
       h('button', { class: 'btn ghost small', onclick: async () => {
