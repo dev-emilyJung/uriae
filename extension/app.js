@@ -1,5 +1,5 @@
 import { api, paginate, currentEnrollments, NotLoggedInError } from './lib/api.js';
-import { buildCards, ymd } from './lib/extract.js';
+import { buildCards, ymd, fixOcrLine, isReadable, isReferenceDoc } from './lib/extract.js';
 import { store, K } from './lib/store.js';
 
 const main = document.getElementById('main');
@@ -197,7 +197,11 @@ async function showPrep() {
   const draw = () => {
     for (const p of posts.values()) {
       p.docImages = p.images.filter((img) => ocr[imgKey(img)]?.doc);
-      p.imgText = p.docImages.map((img) => ocr[imgKey(img)].text).join('\n');
+      // 식단표·교육계획안이나 글자가 대부분 깨진 그림은 카드에 그림만 붙이고 챙길 것은 뽑지 않는다
+      p.imgText = p.docImages
+        .map((img) => ocr[imgKey(img)].text.split('\n').map(fixOcrLine).join('\n'))
+        .filter((text) => isReadable(text) && !isReferenceDoc(text))
+        .join('\n');
     }
     const cards = buildCards([...posts.values()]);
     const upcoming = cards.filter((c) => c.date >= t);

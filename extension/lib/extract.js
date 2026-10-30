@@ -79,6 +79,7 @@ function cleanItem(s) {
     .replace(BULLET, '')
     .replace(/^[\s:：\-|]+/, '')
     .replace(/[⭐★☆✨❤️💕😊🙏]/gu, '')
+    .replace(/\s*\([^)]{8,}\)?\s*$/, '') // "물통 (도보 유아는 9시 30분까지 …)" 처럼 뒤에 붙은 긴 덧붙임
     .replace(/\s+/g, ' ')
     .trim();
 }
@@ -110,19 +111,25 @@ export function extractFromPost(post) {
   const push = (arr, s) => {
     const c = cleanItem(s);
     if (c.length < 2 || c.length > 90) return;
+    // 표 칸막이(|)·밑줄·홀로 된 자음/모음이 든 줄은 그림 글자를 잘못 읽은 것이라 항목이 아니다
+    if (/[|｜_]|(?:^|\s)[ㄱ-ㅎㅏ-ㅣ](?=\s|$)/.test(c)) return;
+    // "도시락은 준비하지 않습니다" 처럼 챙기지 않아도 된다는 안내
+    if (arr === prep && /(?:않습니다|않아도|안\s*보내셔도|필요\s*없)/.test(c)) return;
     const key = c.replace(/\s/g, '');
     if (seen.has(key)) return;
     seen.add(key);
     arr.push(c);
   };
 
+  let prepLine = -1; // 준비물이 처음 나온 줄 (날짜를 그 근처에서 찾는다)
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     const isAnchor = PREP_ANCHOR.test(line) || DRESS_ANCHOR.test(line);
 
-    // "준비물: 물통, 모자, 운동화" 같은 한 줄 나열
-    const inline = line.match(/(?:준비물|복장)\s*[:：]\s*(.+)/);
+    // "준비물: 물통, 모자, 운동화" 같은 한 줄 나열 (그림 글자에서는 : 가 ; 로 읽히기도 한다)
+    const inline = line.match(/(?:준비물|복장)\s*[:：;]\s*(.+)/);
     if (inline) {
+      if (prepLine < 0 && /준비물/.test(line)) prepLine = i;
       inline[1].split(/[,，、/]|\s및\s/).forEach((x) => push(prep, x));
       continue;
     }
@@ -134,6 +141,8 @@ export function extractFromPost(post) {
       const dress = DRESS_ANCHOR.test(line);
       while (j < lines.length && collected < 15) {
         const next = lines[j];
+        // "4. 겨울방학 일정 안내" 같은 다음 단락 제목에서는 멈춘다
+        if (/^\d+\.\s.*(안내|일정|알림)\s*$/.test(next)) break;
         const ok = BULLET.test(next) || (dress && collected < 4 && next.length < 60 && !PREP_ANCHOR.test(next) && !/^\d+\.\s/.test(next));
         if (!ok) break;
         push(prep, next);
@@ -153,9 +162,15 @@ export function extractFromPost(post) {
     }
   }
 
-  // 날짜: 앵커/일정 문장이 있는 줄 우선, 없으면 본문 전체
+  // 날짜: 준비물 줄 바로 위의 "일정 : 10월 28일" 같은 줄(여러 행사를 한 장에 안내하는 가정통신문),
+  // 다음은 앵커/일정 문장이 있는 줄, 없으면 본문 전체
+  let date = null;
+  for (let j = prepLine; j >= 0 && j >= prepLine - 4 && !date; j--) {
+    if (j < prepLine && /^\d+[.,]\s/.test(lines[j])) break; // 앞 단락으로 넘어가지 않는다
+    date = resolveDate(lines[j], post.date);
+  }
   const focus = lines.filter((l) => PREP_ANCHOR.test(l) || EVENT.test(l)).join(' ');
-  const date = resolveDate(focus, post.date) || resolveDate((post.title || '') + ' ' + (post.content || ''), post.date);
+  date ||= resolveDate(focus, post.date) || resolveDate((post.title || '') + ' ' + (post.content || ''), post.date);
 
   return { prep, events: events.slice(0, 3), times: times.slice(0, 2), date };
 }
@@ -232,5 +247,87 @@ export function cleanOcrText(raw) {
       const ok = (l.match(/[가-힣0-9]/g) || []).length;
       return ok >= 2 && ok >= l.replace(/\s/g, '').length * 0.5;
     })
+    .map(fixOcrLine)
     .join('\n');
+}
+
+// ── 그림 글자 바로잡기 ──
+// 그림 글자는 한 글자 안에서 자음·모음 하나가 비슷한 모양으로 바뀌는 일이 많다 (준비몰→준비물, 불통→물통, 5열→5일).
+// 날짜와 안내문에 자주 나오는 낱말만, 자모 하나(긴 낱말은 둘)까지 다를 때 바로잡는다.
+// 낱말 뒤가 비었거나 조사일 때만 고친다: "상당히"·"복잡한" 같은 다른 낱말을 건드리지 않게
+const OCR_WORDS = [
+  '준비물', '물통', '수저', '수저통', '도시락', '여벌옷', '원복', '체육복', '운동화', '실내화', '모자', '돗자리', '우비', '장화',
+  '물티슈', '손수건', '간식', '점심', '견학', '현장학습', '소풍', '행사', '일정', '행사일정', '상담', '학부모', '담임', '등원',
+  '방학', '방학식', '개학식', '졸업', '수료', '생일', '생일축하', '참가비', '동의서', '신청서', '가정통신문',
+  '출발', '도착', '장소', '일시', '안내', '유치원', '어린이집', '선생님', '체험학습', '겨울방학', '여름방학', '보내주세요', '챙겨주세요',
+];
+// 그림 글자에서 실제로 자주 헷갈리는 모양 (초성·중성·종성 번호 짝). 두 글자 낱말은 이 경우만 고친다 ("우리"→"우비" 같은 일 막기)
+const LOOKALIKE = [
+  [[6, 7], [6, 11], [14, 18]], // 초성 ㅁㅂ ㅁㅇ ㅊㅎ
+  [[4, 6], [8, 13], [6, 20], [1, 5], [13, 18]], // 중성 ㅓㅕ ㅗㅜ ㅕㅣ ㅐㅔ ㅜㅡ
+  [[8, 16], [16, 21], [7, 8]], // 종성 ㄹㅁ ㅁㅇ ㄷㄹ
+].map((pairs) => new Set(pairs.flatMap(([a, b]) => [`${a},${b}`, `${b},${a}`])));
+function lookalike(a, b) {
+  const x = jamo(a), y = jamo(b);
+  return !!x && !!y && [0, 1, 2].every((i) => x[i] === y[i] || LOOKALIKE[i].has(`${x[i]},${y[i]}`));
+}
+const OCR_SET = new Set(OCR_WORDS);
+const PARTICLE = /^(?:은|는|이|가|을|를|의|에|에서|에게|도|과|와|로|으로|만|까지|부터|및|입니다)?$/;
+const WEEKDAY = '월화수목금토일';
+
+function jamo(ch) {
+  const c = ch.charCodeAt(0) - 0xac00;
+  return c < 0 || c > 11171 ? null : [Math.floor(c / 588), Math.floor((c % 588) / 28), c % 28];
+}
+/** 두 글자의 초성·중성·종성 중 다른 개수 (한글이 아니면 크게) */
+function jamoDiff(a, b) {
+  if (a === b) return 0;
+  const x = jamo(a), y = jamo(b);
+  return x && y ? (x[0] !== y[0]) + (x[1] !== y[1]) + (x[2] !== y[2]) : 9;
+}
+function fixWord(w) {
+  for (let n = 2; n <= w.length; n++) if (OCR_SET.has(w.slice(0, n)) && PARTICLE.test(w.slice(n))) return w; // 이미 맞는 낱말
+  for (const word of OCR_WORDS) {
+    const n = word.length;
+    if (w.length < n || !PARTICLE.test(w.slice(n))) continue;
+    let d = 0;
+    for (let i = 0; i < n && d < 9; i++) d += jamoDiff(w[i], word[i]);
+    if (d === 0 || d > (n >= 4 ? 2 : 1)) continue;
+    if (n === 2 && ![0, 1].every((i) => w[i] === word[i] || lookalike(w[i], word[i]))) continue;
+    return word + w.slice(n);
+  }
+  return w;
+}
+
+/** 그림에서 읽은 한 줄 바로잡기 (낱말, 날짜, 요일) */
+export function fixOcrLine(line) {
+  return line
+    .replace(/[가-힣]+/g, fixWord)
+    // 숫자 뒤 "월"·"일"이 비슷한 글자로 읽힌 것: 11뭘, 11될, 12를 → 월 / 5열, 6얼, 19밀 → 일
+    .replace(/(\d)\s?(?:뭘|될|훨|윌|웰|를|뮐|룰|웜)(?=[\s(~),.]|$)/g, '$1월')
+    .replace(/(\d)\s?(?:열|얼|밀|길|엘|올)(?=[\s(~),.]|$)/g, '$1일')
+    // 괄호 속 요일: (복)→(목), (뭘)→(월), (목} → (목)
+    .replace(/\(([가-힣])[)}]/g, (m, c) => {
+      if (WEEKDAY.includes(c)) return `(${c})`;
+      const near = [...WEEKDAY].filter((w) => jamoDiff(c, w) === 1);
+      return near.length === 1 ? `(${near[0]})` : m;
+    })
+    // 12를 넘는 달: 1 을 7 로 잘못 읽은 것 (17월 → 11월, 77월 → 11월)
+    .replace(/(?<!\d)(\d{2})월/g, (m, mm) => {
+      if (+mm <= 12) return m;
+      const f = mm.replaceAll('7', '1');
+      return +f >= 1 && +f <= 12 ? `${f}월` : m;
+    });
+}
+
+/** 식단표·주간교육계획안처럼 표가 많은 참고 자료: 그림은 보여주되 챙길 것을 뽑지는 않는다 */
+export function isReferenceDoc(text) {
+  const head = text.split('\n').slice(0, 4).join(' ');
+  return /식단|계획안|교육\s*계획|생활\s*주제|교육\s*기간|시기\s*\d{4}/.test(head);
+}
+
+/** 글자가 대부분 깨져 읽힌 그림(영어 교재, 사진이 많은 안내 등): 챙길 것을 뽑지 않는다 */
+export function isReadable(text) {
+  const chars = text.replace(/\s/g, '');
+  return chars.length > 0 && (text.match(/[가-힣]/g) || []).length / chars.length >= 0.55;
 }
