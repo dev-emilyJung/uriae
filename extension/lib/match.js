@@ -7,14 +7,28 @@
 
 const DAY = 86400000;
 
-export function cosine(a, b) {
-  let d = 0, x = 0, y = 0;
-  for (let i = 0; i < a.length; i++) {
-    d += a[i] * b[i];
-    x += a[i] * a[i];
-    y += b[i] * b[i];
+// 특징값마다 길이 1로 맞춘 벡터를 한 번만 만들어 둔다 (반 앨범 전체를 여러 번 비교하므로 계산이 크게 준다)
+const UNIT = new WeakMap();
+export function unitOf(v) {
+  let u = UNIT.get(v);
+  if (!u) {
+    let n = 0;
+    for (let i = 0; i < v.length; i++) n += v[i] * v[i];
+    n = Math.sqrt(n);
+    u = new Float32Array(v.length);
+    if (n) for (let i = 0; i < v.length; i++) u[i] = v[i] / n;
+    UNIT.set(v, u);
   }
-  return x && y ? d / Math.sqrt(x * y) : 0;
+  return u;
+}
+export function dot(a, b) {
+  let d = 0;
+  for (let i = 0; i < a.length; i++) d += a[i] * b[i];
+  return d;
+}
+
+export function cosine(a, b) {
+  return dot(unitOf(a), unitOf(b));
 }
 
 /** 사진 날짜에 맞는 기준 얼굴 고르기: ±9개월 안의 기준이 2개 이상이면 그것만, 아니면 가까운 순 4개 */
@@ -214,20 +228,18 @@ export const NEAR = { n: 3, demote: 0.92, promote: 0.97 };
  * scoreOf(photo, face) → { raw }, refsOf(photo) → 그 사진 날짜의 기준 얼굴들
  */
 export function checkNeighbors(photos, out, forced, th, scoreOf, refsOf) {
-  const unit = (v) => {
-    let n = 0;
-    for (const x of v) n += x * x;
-    n = Math.sqrt(n) || 1;
-    return Float32Array.from(v, (x) => x / n);
-  };
-  const dot = (a, b) => {
-    let d = 0;
-    for (let i = 0; i < a.length; i++) d += a[i] * b[i];
-    return d;
-  };
+  const unit = unitOf;
+  // 가장 큰 n개의 평균 (전체 정렬 없이)
   const topMean = (xs) => {
-    xs.sort((a, b) => b - a);
-    const t = xs.slice(0, NEAR.n);
+    const t = [];
+    for (const x of xs) {
+      if (t.length < NEAR.n) t.push(x);
+      else {
+        let m = 0;
+        for (let i = 1; i < t.length; i++) if (t[i] < t[m]) m = i;
+        if (x > t[m]) t[m] = x;
+      }
+    }
     return t.reduce((s, x) => s + x, 0) / t.length;
   };
   // 비교 무리: 우리 아이와 어느 정도 닮은 얼굴(확인 필요 하한 이상)만. 다른 아이 얼굴은 비교에 쓸 일이 없고 계산만 늘린다
