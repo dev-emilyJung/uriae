@@ -72,6 +72,20 @@
   .tileimg p { margin: 0; font-size: 15px; line-height: 1.6; color: #4b5158; }
   .tileimg .pics { position: absolute; right: -10px; top: 26px; display: grid; grid-template-columns: repeat(2, 76px); gap: 6px; transform: rotate(4deg); }
   .tileimg .pics svg { width: 76px; height: 76px; display: block; border-radius: 3px; }
+
+  .og { width: 1200px; height: 630px; background: #fbf7f0; color: #1e2125; overflow: hidden; display: none; }
+  .og.on { display: block; position: fixed; left: 0; top: 0; }
+  .og .in { position: absolute; left: 88px; top: 0; bottom: 0; width: 580px; display: flex; flex-direction: column; justify-content: center; }
+  .og .brand { display: flex; align-items: center; gap: 14px; font-weight: 700; font-size: 26px; color: #4b5158; margin-bottom: 30px; }
+  .og .brand img { width: 56px; height: 56px; border-radius: 12px; }
+  .og h3 { font: 700 62px/1.28 "Gowun Batang", serif; margin: 0 0 28px; letter-spacing: -0.03em; }
+  .og h3 em { font-style: normal; color: #2f7a4a; }
+  .og p { margin: 0; font-size: 25px; line-height: 1.6; color: #4b5158; }
+  .og .pics { position: absolute; right: 72px; top: 50%; display: grid; grid-template-columns: repeat(3, 132px); gap: 12px; transform: translateY(-50%) rotate(3deg); }
+  .og .pic { position: relative; width: 132px; height: 132px; border-radius: 6px; overflow: hidden; box-shadow: 0 6px 18px rgba(30, 33, 37, .14); }
+  .og .pic svg { width: 100%; height: 100%; display: block; }
+  .og .pic.off svg { opacity: .3; filter: grayscale(1); }
+  .og .pic .ck { position: absolute; right: 7px; top: 7px; width: 30px; height: 30px; border-radius: 50%; background: #2f7a4a; color: #fff; font: 700 18px/30px sans-serif; text-align: center; }
 </style>
 </head>
 <body>
@@ -230,6 +244,16 @@
   <div class="pics" id="t-pics"></div>
 </section>
 
+<!-- 카톡·SNS 공유 미리보기 1200×630 → site/og.png -->
+<section class="og" id="og">
+  <div class="in">
+    <div class="brand"><img src="../extension/icons/icon128.png" alt="" />우리애 한눈에</div>
+    <h3>키즈노트 사진 중<br /><em>우리 아이 사진만</em><br />골라서 한 번에</h3>
+    <p>준비물 정리까지 · 무료 크롬 확장<br />아이 사진은 어디로도 보내지 않아요</p>
+  </div>
+  <div class="pics" id="og-pics"></div>
+</section>
+
 <script>
 // ── 그림 아이 ── (실제 아이 사진 대신)
 const SKIN = ['#f6d3b8', '#f1c6a4', '#f8dcc6', '#eab896'];
@@ -333,7 +357,14 @@ document.getElementById('g-maybe').innerHTML = MAYBE.map((p, i) => tile(draw(p),
 
 document.getElementById('t-pics').innerHTML = [PHOTOS[0], PHOTOS[3], PHOTOS[1], PHOTOS[6]].map(draw).join('');
 
-// #s1 ~ #s5, #t1 만 보이게 (캡처용)
+// 우리 아이 사진은 체크, 다른 아이만 나온 사진(MAYBE 1, 4)은 흐리게
+document.getElementById('og-pics').innerHTML = [PHOTOS[0], PHOTOS[3], PHOTOS[4], PHOTOS[6], MAYBE[1], PHOTOS[2], PHOTOS[5], PHOTOS[11], MAYBE[4]]
+  .map(p => {
+    const off = p === MAYBE[1] || p === MAYBE[4];
+    return `<div class="pic${off ? ' off' : ''}">${draw(p)}${off ? '' : '<span class="ck">✓</span>'}</div>`;
+  }).join('');
+
+// #s1 ~ #s5, #t1, #og 만 보이게 (캡처용)
 const id = location.hash.slice(1) || 's1';
 document.getElementById(id).classList.add('on');
 </script>

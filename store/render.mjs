@@ -13,6 +13,7 @@ const shots = [
   ['s4', 1280, 800, 'screenshot-4-faces.png'],
   ['s5', 1280, 800, 'screenshot-5-privacy.png'],
   ['t1', 440, 280, 'promo-small-440x280.png'],
+  ['og', 1200, 630, '../site/og.png'], // 카톡·SNS 공유 미리보기
 ];
 for (const [id, w, h, out] of shots) {
   execFileSync(chrome, [
