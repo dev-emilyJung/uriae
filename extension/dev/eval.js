@@ -133,6 +133,15 @@ async function drawUsage() {
       r.maybe, r.maybeYes + r.maybeNo, r.maybeYes, rate(r.maybeYes, r.maybeNo),
     ]),
   ) : h('p', { class: 'note' }, '아직 없음. 압축 해제로 불러온(개발용) 확장에서 사진을 찾고 Y/N을 눌러 주세요.'));
+  // 판정 숫자 내보내기 (사진·얼굴 정보 없음). tests/private/ 에 두면 Claude가 기준을 분석한다
+  if (log.some((r) => r.samples?.length)) {
+    const btn = h('button', {}, '판정 숫자 내보내기 (face-log.json)');
+    btn.onclick = () => {
+      const blob = new Blob([JSON.stringify({ exportedAt: new Date().toISOString(), log }, null, 1)], { type: 'application/json' });
+      h('a', { href: URL.createObjectURL(blob), download: 'face-log.json' }).click();
+    };
+    $('usage').append(btn);
+  }
 }
 drawUsage();
 

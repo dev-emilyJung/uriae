@@ -149,6 +149,7 @@ export function classifyPhotos(photos, refs, { pos = [], neg = [], forced = new 
   };
   // 1차: 등록한 기준 얼굴 + 사용자가 확인한 얼굴
   pass(pos);
+  const first = new Map([...out].map(([id, r]) => [id, r.level])); // 1차 판정 (자동 기준 얼굴 효과를 재려고)
   // 2차: 1차에서 아주 확실했던 얼굴을 같은 시기 기준 얼굴로 더해 다시 판정 (사용자가 "아니에요"라고 한 사진은 제외)
   const cands = photos
     .filter((p) => out.get(p.id).level === 3 && out.get(p.id).faceIdx >= 0 && forced.get(p.id) !== 0)
@@ -159,6 +160,7 @@ export function classifyPhotos(photos, refs, { pos = [], neg = [], forced = new 
     });
   const auto = pickAutoRefs(cands, th);
   if (auto.length) pass([...pos, ...auto]);
+  for (const [id, r] of out) r.first = first.get(id);
   return out;
 }
 

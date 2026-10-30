@@ -442,7 +442,9 @@ const DEV = !('update_url' in chrome.runtime.getManifest());
 async function saveFaceLog(log) {
   const c = { sureYes: 0, sureNo: 0, maybeYes: 0, maybeNo: 0 };
   for (const [key, yes] of log.answers) c[`${log.first.get(key)}${yes ? 'Yes' : 'No'}`]++;
-  const entry = { at: log.at, label: log.label, strictness: log.strictness, sure: log.sure, maybe: log.maybe, ...c };
+  // samples: 답한 사진마다 판정 숫자와 답 (어떤 숫자에서 맞고 틀리는지 분석용)
+  const samples = [...log.answers].map(([key, yes]) => ({ kind: log.first.get(key), yes, ...log.info.get(key) }));
+  const entry = { at: log.at, label: log.label, strictness: log.strictness, refs: log.refs, sure: log.sure, maybe: log.maybe, ...c, samples };
   const list = (await store.get(K.faceLog, [])).filter((x) => x.at !== log.at);
   await store.set(K.faceLog, [...list, entry].slice(-50));
 }
@@ -549,6 +551,7 @@ function classifyKid(kid, mine, reports, strictness) {
     j.score = r.z;
     j.raw = r.raw;
     j.faceIdx = r.faceIdx;
+    j.first = r.first;
   }
   return {
     child: kid.child,
@@ -666,11 +669,20 @@ async function runSearch({ since, until, label }, kids, ui) {
     if (DEV) {
       // 처음 판정(고치기 전)을 기준으로 Y/N 답을 모아 정확도를 잰다 (숫자만, 개발용 설치에서만)
       const first = new Map();
+      const info = new Map(); // 사진별 판정 숫자 (얼굴 정보·사진은 남기지 않는다)
       for (const g of groups) {
-        for (const j of g.sure) first.set(`${g.child}:${j.img.id}`, 'sure');
-        for (const j of g.maybe) first.set(`${g.child}:${j.img.id}`, 'maybe');
+        for (const [kind, list] of [['sure', g.sure], ['maybe', g.maybe]]) {
+          for (const j of list) {
+            const key = `${g.child}:${j.img.id}`;
+            const faces = faceMem.get(j.img.id) || [];
+            const f = faces[j.faceIdx] || {};
+            first.set(key, kind);
+            info.set(key, { z: +j.score.toFixed(3), raw: +j.raw.toFixed(3), size: Math.round(f.size || 0), score: +(f.score ?? 1).toFixed(2), faces: faces.length, pass1: j.first });
+          }
+        }
       }
-      photoState.log = { at: Date.now(), label, strictness, sure: groups.reduce((n, g) => n + g.sure.length, 0), maybe: groups.reduce((n, g) => n + g.maybe.length, 0), first, answers: new Map() };
+      const refs = kids.reduce((n, k) => n + k.refs.length, 0);
+      photoState.log = { at: Date.now(), label, strictness, refs, sure: groups.reduce((n, g) => n + g.sure.length, 0), maybe: groups.reduce((n, g) => n + g.maybe.length, 0), first, info, answers: new Map() };
     }
     drawResults(ui.results);
     ui.status.textContent = summaryText(groups);
