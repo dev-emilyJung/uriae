@@ -37,6 +37,18 @@ echo '*/10 * * * * root nice -n 19 ionice -c3 /usr/local/bin/uriae-update-admin'
 
 https://uriae.emilysoft.com/admin.html 접속 → 아이디·비밀번호 입력.
 
+사람 방문만 센다: 로봇은 보통 HTML만 받으므로 style.css 까지 받은 (IP, 브라우저)만 남긴다.
+본인 방문은 `/etc/uriae-admin-exclude` 에 IP를 한 줄에 하나씩 적어 뺀다 (앞부분만 써도 됨, 예: `211.234.`). IP는 공개 저장소에 넣지 않는다.
+
+```bash
+# 내 IP 확인: 집·회사 PC 각각에서 https://ifconfig.me 를 열어 보거나, 서버에서 최근 기록 보기
+sudo tail -n 20 /var/log/nginx/uriae.access.log
+echo '123.45.67.89' | sudo tee -a /etc/uriae-admin-exclude
+sudo /usr/local/bin/uriae-update-admin
+```
+
+`update-admin.sh` 를 고친 뒤에는 다시 복사: `sudo cp /opt/uriae/server/update-admin.sh /usr/local/bin/uriae-update-admin`
+
 볼 수 있는 것: 방문자 수, 페이지별 조회수, 유입 경로(어느 카페·블로그에서 왔는지), 국가, 브라우저, 시간대별 방문.
 `/privacy.html` 조회수는 웹스토어 심사·설치 직전 확인으로도 참고할 수 있다.
 
