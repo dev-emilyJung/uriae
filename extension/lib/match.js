@@ -219,7 +219,9 @@ export function classifyPhotos(photos, refs, { pos = [], neg = [], forced = new 
  * 비율 0.85 + 점수 여유 0.3 에서 "우리 아이" 170장 중 다른 아이 0장, 우리 아이의 82.5%를 바로 찾음
  * (0.92 만 쓰면 다른 아이 0.9% 이지만 바로 찾음 55%, 1.0.1 방식은 다른 아이 11.9% · 바로 찾음 94%)
  */
-export const NEAR = { n: 3, demote: 0.85, promote: 0.97, zMargin: 0.3 };
+export const NEAR = { n: 3, demote: 0.85, promote: 0.97, zMargin: 0.3, drop: 0.72 };
+// drop: 비율이 이보다 낮으면 "확인 필요"에서도 뺀다 (확인 필요 기준이 느슨해서 다른 아이가 많이 섞였다.
+//       실제 Y/N: 확인 필요로 간 답 79장에서 다른 아이 16장이 빠지고 우리 아이는 0장. 0.75 부터는 우리 아이도 빠진다)
 
 /**
  * 이웃 비교: "이 얼굴은 자기와 가장 닮은 앨범 속 얼굴들만큼 우리 아이 기준 얼굴과도 닮았나?"
@@ -267,7 +269,8 @@ export function checkNeighbors(photos, out, forced, th, scoreOf, refsOf) {
       // 아슬아슬하게 기준을 넘은 얼굴은 확인 필요로 (실제 사진에서 다른 아이는 대개 기준 바로 위였다)
       if (level === 3 && c.z < th.sure + NEAR.zMargin) level = 1;
       if (ratio != null) {
-        if (level === 3 && ratio < NEAR.demote) level = 1;
+        if (ratio < NEAR.drop) level = 0;
+        else if (level === 3 && ratio < NEAR.demote) level = 1;
         else if (level === 1 && ratio >= NEAR.promote && c.raw >= th.rawSure && f.size >= SURE_MIN_PX && (f.score ?? 1) >= SURE_MIN_SCORE) level = 3;
       }
       if (!best || level > best.level || (level === best.level && c.z > best.z)) best = { ...c, level, near: ratio };

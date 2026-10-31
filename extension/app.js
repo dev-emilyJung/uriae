@@ -562,8 +562,6 @@ function classifyKid(kid, mine, reports, strictness) {
     if (old) {
       j.legacy = old.get(j.img.id).level;
       j.levelNow = r.level;
-      // 기존 방식은 찾았는데 새 방식이 뺀 사진도 Y/N을 받을 수 있게 확인 필요에 보인다 (개발용 설치에서만)
-      if (j.legacy && !j.level) j.level = 1;
     }
   }
   return {

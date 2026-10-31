@@ -19,6 +19,11 @@ test('실제 사진 Y/N: 우리 아이로 찾은 사진은 거의 다 맞고, �
   const found = sure.filter((s) => s.yes).length;
   const pct = (v) => `${(v * 100).toFixed(1)}%`;
   console.log(`\n[실제 사진] 답 ${usable.length}장 · 우리 아이로 찾음 ${sure.length}장 중 다른 아이 ${wrong}장(${pct(wrong / sure.length)}) · 우리 아이 ${yes}장 중 바로 찾음 ${pct(found / yes)}`);
+  // 확인 필요에서도 빼는 사진(이웃 비교 비율이 아주 낮음): 우리 아이는 거의 없어야 한다
+  const dropped = usable.filter((s) => s.near < NEAR.drop);
+  const lost = dropped.filter((s) => s.yes).length;
+  console.log(`[실제 사진] 확인 필요에서도 빼는 사진 ${dropped.length}장 중 우리 아이 ${lost}장`);
   assert.ok(wrong / sure.length <= 0.02, '우리 아이로 찾은 사진 중 다른 아이는 2% 이하');
   assert.ok(found / yes >= 0.75, '우리 아이의 75% 이상은 바로 찾는다');
+  assert.ok(lost / yes <= 0.01, '아예 빼는 사진 때문에 놓치는 우리 아이는 1% 이하');
 });
