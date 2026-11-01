@@ -23,6 +23,40 @@ awk -F'"' -v ex="$EXCLUDE" '
   { x = ip($1); if ((x "|" $6) in human && !mine(x)) print }
 ' "$RAW" "$RAW" > "$DATA"
 
+# 어디서 왔나 (admin-sources.json): 홈 화면을 연 방문을 날짜·IP·브라우저마다 한 번씩 나눠 센다
+#  - 카톡: 휴대폰 카톡 안 브라우저(브라우저 정보에 KAKAOTALK). PC 카톡은 크롬으로 열려서 "직접"에 섞인다
+#  - 검색: 구글·네이버·다음·빙에서 링크를 누름
+#  - 다른 사이트 / 직접·알 수 없음(주소 입력, 즐겨찾기, PC 카톡, 앱)
+#  - 카톡방에 링크가 올라감(대략): 카카오 미리보기 수집기(kakaotalk-scrap)가 홈을 가져간 횟수. 카카오가 미리보기를 한동안 저장해 두므로 실제보다 적다
+awk -F'"' '
+  function ip(s) { split(s, a, " "); return a[1] }
+  function day(s) { split(s, a, "[\\[:]"); return a[2] }
+  function home(r) { return r ~ /^GET \/(index\.html)?([?#][^ ]*)? / }
+  NR == FNR {
+    if ($6 ~ /kakaotalk-scrap/ && home($2)) { d = day($1); share[d]++; shares++; days[d] = 1 }
+    next
+  }
+  home($2) {
+    d = day($1); k = d "|" ip($1) "|" $6
+    if (k in seen) next
+    seen[k] = 1
+    if ($6 ~ /KAKAOTALK/) s = "kakao"
+    else if ($4 ~ /^https?:\/\/((www\.)?google\.|([a-z]+\.)?search\.naver\.com|([a-z]+\.)?search\.daum\.net|(www\.)?bing\.com)/) s = "search"
+    else if ($4 == "-" || $4 ~ /emilysoft\.com/) s = "direct"
+    else s = "other"
+    n[s]++; by[d, s]++; days[d] = 1
+  }
+  END {
+    printf "{\"kakao\":%d,\"search\":%d,\"other\":%d,\"direct\":%d,\"shares\":%d,\"days\":[", n["kakao"], n["search"], n["other"], n["direct"], shares
+    sep = ""
+    for (d in days) {
+      printf "%s{\"d\":\"%s\",\"kakao\":%d,\"search\":%d,\"other\":%d,\"direct\":%d,\"shares\":%d}", sep, d, by[d, "kakao"], by[d, "search"], by[d, "other"], by[d, "direct"], share[d]
+      sep = ","
+    }
+    print "]}"
+  }
+' "$RAW" "$DATA" > /tmp/uriae-admin-sources.json && mv /tmp/uriae-admin-sources.json "$WEB/admin-sources.json"
+
 if [ -s "$DATA" ] \
   && goaccess "$DATA" $OPTS -o /tmp/uriae-admin.json > /tmp/uriae-goaccess.log 2>&1 \
   && goaccess "$DATA" $OPTS --html-report-title="우리애 한눈에 방문 통계" -o /tmp/uriae-admin-full.html >> /tmp/uriae-goaccess.log 2>&1; then
