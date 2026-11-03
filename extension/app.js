@@ -1,6 +1,7 @@
 import { api, paginate, currentEnrollments, NotLoggedInError } from './lib/api.js';
 import { buildCards, ymd, fixOcrLine, isReadable, isReferenceDoc } from './lib/extract.js';
 import { store, K } from './lib/store.js';
+import { logError, logOcr, logRun, hiddenTimer } from './lib/diag.js';
 
 const main = document.getElementById('main');
 // 홈페이지 "의견 보내기"로 갈 때 어느 버전에서 왔는지 함께 (주소에만 붙고, 이용자가 직접 보낼 때만 기록된다)
@@ -12,6 +13,17 @@ if (!('update_url' in chrome.runtime.getManifest())) {
     Object.assign(document.createElement('a'), { href: 'dev/prep-eval.html', target: '_blank', textContent: '개발: 알림장 내보내기' }),
   );
 }
+// 예상 못 한 오류는 문장만 진단용으로 남긴다 (주소·id 는 지움, 어디로도 보내지 않음)
+addEventListener('error', (e) => logError(e.error || e.message, 'page'));
+addEventListener('unhandledrejection', (e) => logError(e.reason, 'promise'));
+// 바닥글의 버전 글자를 5번 누르면 문제 진단 화면 (잘 안 된다는 분께 안내용)
+const verEl = document.getElementById('ver');
+verEl.textContent = `v${chrome.runtime.getManifest().version}`;
+let verClicks = [];
+verEl.addEventListener('click', () => {
+  verClicks = [...verClicks.filter((t) => Date.now() - t < 3000), Date.now()];
+  if (verClicks.length >= 5) { verClicks = []; showDiag(); }
+});
 const classBar = document.getElementById('classBar');
 const WEEK = ['일', '월', '화', '수', '목', '금', '토'];
 
@@ -81,6 +93,7 @@ async function boot() {
     enrollments = currentEnrollments(await api.enrollments());
   } catch (e) {
     if (e instanceof NotLoggedInError) return showLogin();
+    logError(e, 'boot');
     return render(stateView('키즈노트에 연결하지 못했어요', String(e.message || e)));
   }
   if (!enrollments.length) return render(stateView('등록된 아이가 없어요', '키즈노트에서 아이 등록이 승인되었는지 확인해 주세요.'));
@@ -164,6 +177,7 @@ const DOC_HINT = /통신문|안내문|안내장|첨부|신청서|동의서|식�
 const imgKey = (img) => String(img.id ?? (img.original || img.large || '').split('?')[0]);
 const hhmm = (d) => `${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}`;
 let prepRun = 0;
+let lastPrep = null; // 마지막으로 그린 챙길 것 {posts, cards} (진단 파일용, 이 탭이 열려 있는 동안만)
 let ocrJob = Promise.resolve(); // 지금 하고 있는 그림 읽기
 async function showPrep() {
   const run = ++prepRun;
@@ -188,6 +202,7 @@ async function showPrep() {
     }
   } catch (e) {
     if (e instanceof NotLoggedInError) return showLogin();
+    logError(e, 'prep');
     return render(stateView('불러오지 못했어요', String(e.message || e)));
   }
   if (currentTab !== 'prep' || run !== prepRun) return;
@@ -216,6 +231,7 @@ async function showPrep() {
         .join('\n');
     }
     const all = buildCards([...posts.values()]);
+    lastPrep = { posts: [...posts.values()], cards: all };
     const cards = all.filter((c) => !hidden[c.key] || justHidden.has(c.key));
     const hiddenCards = all.filter((c) => hidden[c.key] && !justHidden.has(c.key));
     const setHidden = (c, on) => {
@@ -412,11 +428,15 @@ async function readDocImages(run, posts, ocr, status, draw) {
     for (const [k, { p, img }] of todo) {
       if (currentTab !== 'prep' || run !== prepRun) break;
       status.textContent = `그림 안내문 확인 중 ${++i}/${todo.size}`;
+      const t0 = performance.now();
       try {
         const r = await readImage(img.original || img.large);
         ocr[k] = r.doc ? { at: p.date, doc: 1, text: r.text } : { at: p.date };
         if (r.doc) found++;
-      } catch { /* 받지 못한 그림은 다음에 다시 */ }
+        await logOcr({ ms: Math.round(performance.now() - t0), doc: !!r.doc, chars: r.text?.length || 0, source: p.source });
+      } catch (e) {
+        logError(e, 'ocr'); // 받지 못한 그림은 다음에 다시
+      }
     }
   } finally {
     await closeOcr();
@@ -438,7 +458,7 @@ let photoState = null;
 // 개발용 설치(압축 해제 로드)인지. 스토어 설치에는 update_url 이 있다
 const DEV = !('update_url' in chrome.runtime.getManifest());
 
-/** 사진 찾기 정확도 기록 (개발용): 처음 판정별로 Y/N 답 수만 남긴다. dev/eval.html 에서 본다 */
+/** 사진 찾기 정확도 기록: 처음 판정별로 Y/N 답 수와 판정 숫자만 남긴다. 진단 파일과 dev/eval.html 에서 본다 */
 async function saveFaceLog(log) {
   const c = { sureYes: 0, sureNo: 0, maybeYes: 0, maybeNo: 0 };
   for (const [key, yes] of log.answers) c[`${log.first.get(key)}${yes ? 'Yes' : 'No'}`]++;
@@ -588,9 +608,12 @@ async function runSearch({ since, until, label }, kids, ui) {
   ui.results.replaceChildren();
   const fill = ui.bar.firstChild;
 
+  const hiddenMs = hiddenTimer();
+  const t0 = Date.now();
   try {
     ui.status.textContent = '얼굴 인식 모델을 준비하는 중…';
     await initFace();
+    const initMs = Date.now() - t0;
 
     // 1) 아이별 사진 목록. 알림장 사진은 그 아이에게 온 사진이라 얼굴 검사 없이 포함
     ui.status.textContent = '사진 목록을 모으는 중…';
@@ -677,8 +700,19 @@ async function runSearch({ since, until, label }, kids, ui) {
       groups,
       selected: new Set(groups.flatMap((g) => [...g.reports, ...g.sure].map((j) => `${g.child}:${j.img.id}`))),
     };
-    if (DEV) {
-      // 처음 판정(고치기 전)을 기준으로 Y/N 답을 모아 정확도를 잰다 (숫자만, 개발용 설치에서만)
+    // 진단용 수치: 사진 수, 걸린 시간, 백그라운드에 있던 시간, 사진별 얼굴 수 (얼굴 정보·사진 없음)
+    const checkedFaces = todo.filter((j) => faceMem.has(j.img.id)).map((j) => faceMem.get(j.img.id));
+    const sizes = checkedFaces.flat().map((f) => f.size).sort((a, b) => a - b);
+    await logRun({
+      label, strictness, stopped: stopRequested,
+      kids: kids.length, refs: kids.map((k) => k.refs.length), others: kids.map((k) => k.others?.length || 0),
+      photos: total, checked: checkedFaces.length, initMs, ms: Date.now() - t0, hiddenMs: hiddenMs(),
+      faces: { none: checkedFaces.filter((f) => !f.length).length, one: checkedFaces.filter((f) => f.length === 1).length, many: checkedFaces.filter((f) => f.length > 1).length, medianSize: sizes.length ? Math.round(sizes[sizes.length >> 1]) : 0 },
+      sure: groups.reduce((n, g) => n + g.sure.length, 0), maybe: groups.reduce((n, g) => n + g.maybe.length, 0),
+      reports: groups.reduce((n, g) => n + g.reports.length, 0),
+    });
+    {
+      // 처음 판정(고치기 전)을 기준으로 Y/N 답을 모아 정확도를 잰다 (숫자만, 진단 파일과 dev/eval.html 에서 본다)
       const first = new Map();
       const info = new Map(); // 사진별 판정 숫자 (얼굴 정보·사진은 남기지 않는다)
       for (const g of groups) {
@@ -702,8 +736,10 @@ async function runSearch({ since, until, label }, kids, ui) {
     ui.status.textContent = summaryText(groups);
   } catch (e) {
     if (e instanceof NotLoggedInError) return showLogin();
+    logError(e, 'photos');
     ui.status.textContent = '오류: ' + (e.message || e);
   } finally {
+    hiddenMs();
     ui.runBtn.disabled = false;
     ui.stopBtn.hidden = true;
     ui.bar.hidden = true;
@@ -1188,8 +1224,92 @@ async function showPicker(kid, p, done = (flash) => showFaces(flash)) {
     status.textContent = count ? `얼굴 ${count}개를 찾았어요.` : '얼굴을 찾지 못했어요.';
   } catch (err) {
     if (err instanceof NotLoggedInError) return showLogin();
+    logError(err, 'picker');
     status.textContent = '오류: ' + (err.message || err);
   }
+}
+
+// ───────────────────────── 문제 진단 ─────────────────────────
+// 바닥글 버전을 5번 누르면 열린다. 파일은 이 컴퓨터에 저장만 하고, 보낼지는 이용자가 정한다.
+function gpuName() {
+  try {
+    const gl = document.createElement('canvas').getContext('webgl');
+    const ext = gl.getExtension('WEBGL_debug_renderer_info');
+    return ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER);
+  } catch { return null; }
+}
+
+async function showDiag() {
+  prepRun++; // 챙길 것 그림 읽기가 끝나며 화면을 다시 그리지 않게 (닫으면 이어서 읽는다)
+  const { buildReport } = await import('./lib/diag.js');
+  const { isReadable: readable, isReferenceDoc: reference } = await import('./lib/extract.js');
+  const env = {
+    extension: chrome.runtime.getManifest().version,
+    store: !DEV,
+    browser: navigator.userAgentData?.brands?.map((b) => `${b.brand} ${b.version}`).join(', ') || navigator.userAgent,
+    platform: navigator.userAgentData?.platform || navigator.platform,
+    cpu: navigator.hardwareConcurrency, memoryGB: navigator.deviceMemory ?? null, gpu: gpuName(),
+    screen: `${screen.width}×${screen.height}@${devicePixelRatio}`, language: navigator.language,
+  };
+  const kids = kidsOf(enrollments);
+  const settings = {
+    strictness: await store.get(K.strictness, 0.5),
+    kids: kids.length,
+    classes: enrollments.length,
+    selectedClasses: selected.size,
+    refs: await Promise.all(kids.map(async (k) => (await store.get(K.refs(k.child), [])).length)),
+  };
+  const data = {
+    env, settings,
+    diag: await store.get(K.diag, {}),
+    faceLog: await store.get(K.faceLog, []),
+    ocr: await store.get(K.ocr, {}),
+    prep: lastPrep,
+    isReadable: readable, isReferenceDoc: reference,
+  };
+
+  const withText = h('input', { type: 'checkbox' });
+  const preview = h('pre', { class: 'raw diag-preview' });
+  const update = () => { preview.textContent = JSON.stringify(buildReport({ ...data, withText: withText.checked }), null, 2); };
+  withText.onchange = update;
+  update();
+
+  const download = () => {
+    const d = new Date();
+    const stamp = `${ymd(d).replaceAll('-', '')}-${String(d.getHours()).padStart(2, '0')}${String(d.getMinutes()).padStart(2, '0')}`;
+    const a = h('a', { href: URL.createObjectURL(new Blob([preview.textContent], { type: 'application/json' })), download: `uriae-진단-${stamp}.json` });
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  };
+  const clear = async () => {
+    await store.remove(K.diag);
+    await store.remove(K.faceLog);
+    showDiag();
+  };
+
+  render(
+    h('div', { class: 'diag' },
+      h('h2', {}, '문제 진단 파일'),
+      h('p', {}, '잘 안 되는 부분을 고치는 데 쓰는 숫자 모음이에요. 이 컴퓨터에 파일로 저장만 하고, 확장 프로그램은 어디로도 보내지 않아요. 보내 주실지는 직접 정해 주세요.'),
+      h('ul', { class: 'diag-list' },
+        h('li', {}, h('b', {}, '들어가는 것 '), '확장·브라우저 버전, 사진 찾기에 걸린 시간과 사진·얼굴 수, "맞아요·아니에요" 답과 그 사진의 판정 점수, 그림 안내문을 읽은 시간, 오류 문장'),
+        h('li', {}, h('b', {}, '들어가지 않는 것 '), '사진, 얼굴 그림과 얼굴 특징값, 아이·원·반 이름, 키즈노트 계정'),
+      ),
+      h('label', { class: 'diag-opt' }, withText,
+        h('span', {}, h('b', {}, '알림장·공지 글 내용도 넣기'),
+          lastPrep
+            ? ' 준비물을 잘못 뽑거나 놓칠 때 필요해요. 원 이름이나 아이 이름이 들어 있을 수 있으니 보내기 전에 아래 내용을 확인해 주세요.'
+            : ' 챙길 것 탭을 한 번 연 뒤에 넣을 수 있어요.')),
+      h('div', { class: 'toolbar' },
+        h('button', { class: 'btn', onclick: download }, '진단 파일 내려받기'),
+        h('button', { class: 'btn ghost', onclick: () => showTab(currentTab) }, '닫기'),
+        h('button', { class: 'linkbtn manage-btn', onclick: clear }, '기록 지우기'),
+      ),
+      h('p', { class: 'muted' }, '받은 파일은 ', h('a', { href: 'mailto:emilyjung@emilysoft.com' }, 'emilyjung@emilysoft.com'), '으로 보내 주세요. 문제를 고치는 데만 쓰고, 다 고치면 지워요.'),
+      preview,
+    ),
+  );
+  if (!lastPrep) withText.disabled = true;
 }
 
 boot();

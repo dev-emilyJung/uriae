@@ -86,6 +86,7 @@ extension/
 ├── app.html / .css / .js
 └── lib/
     ├── api.js         # 키즈노트 웹 내부 API 클라이언트 (요청 간격 제한 포함)
+    ├── diag.js        # 문제 진단 파일 (바닥글 버전 5번 누르기, 이용자가 직접 내려받아 보냄)
     ├── extract.js     # 준비물·일정 추출 규칙
     ├── face.js        # 얼굴 검출·특징값 (브라우저 내)
     ├── match.js       # 얼굴 판정 규칙

@@ -18,7 +18,8 @@ export const K = {
   selected: 'selectedClasses', // 선택한 반(소속 id) 목록. 없으면 전체 선택
   checked: 'checked', // 챙김 체크 상태 {itemKey: true}
   hidden: 'hiddenCards', // "해당 없음"으로 지운 안내 카드 {cardKey: 안내 날짜} (60일 지나면 정리)
-  faceLog: 'dev:faceLog', // 개발용 설치에서만: 사진 찾기별 Y/N 답 수 [{at, label, sure, maybe, sureYes, sureNo, maybeYes, maybeNo}]
+  faceLog: 'dev:faceLog', // 사진 찾기별 Y/N 답 수와 사진별 판정 숫자 [{at, label, sure, maybe, sureYes, …, samples}] (진단 파일·dev/eval.html 용, 얼굴 정보 없음)
+  diag: 'diag1', // 진단 파일용 수치 {runs: 사진 찾기, ocr: 그림 읽기, errors: 오류 문장} (최근 것만)
   prepView: 'prepView', // 챙길 것 보기 방식 'list' | 'cal'
   refs: (child) => `refs:${child}`, // 아이별 기준 얼굴 임베딩 [{id, emb:number[], thumb}]
   scores: (child) => `scores2:${child}`, // 아이별 사진 얼굴 점수 {sig: 기준얼굴 id 목록, map: {imageId: [얼굴별 점수]}}
