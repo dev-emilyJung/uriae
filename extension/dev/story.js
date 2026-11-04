@@ -4,7 +4,7 @@
 import { api, paginate, NotLoggedInError } from '../lib/api.js';
 import { ymd } from '../lib/extract.js';
 import { store } from '../lib/store.js';
-import { buildStory, ageLabel, MONTH_TITLE, byParent, joinParts, norm } from './story-rules.js';
+import { buildStory, ageLabel, MONTH_TITLE, byParent, joinParts, norm, bestLine, splitSaid } from './story-rules.js';
 
 const $ = (id) => document.getElementById(id);
 function h(tag, attrs = {}, ...kids) {
@@ -29,6 +29,14 @@ const src = (img) => img.large || img.original || img.small;
 // 사진은 칸에 맞춰 잘리므로, 얼굴이 있는 곳을 가운데로 둔다 (얼굴 위치는 이 컴퓨터에서 찾아 저장)
 const FOCUS = 'dev:storyFocus'; // {"사진 id": "x% y%"}
 let focus = {};
+// 사진 속 얼굴 수: 표지·달 첫 사진·자란 모습 비교에는 우리 아이 혼자 나온 사진(얼굴 1개)을 먼저 쓴다
+const FACES = 'dev:storyFaces'; // {"사진 id": 얼굴 수}
+let faceN = {};
+const solo = (p) => faceN[imgId(p)] === 1;
+/** 혼자 나온 사진을 먼저, 없으면 아무 사진 */
+const pick = (list) => list.find(solo) || list[0];
+/** 글에서 아이가 한 말(따옴표)만 색을 달리한다 */
+const textView = (text) => splitSaid(text).map((x) => (x.said ? h('span', { class: 'said' }, x.t) : x.t));
 const smallUrl = new Map(); // 사진 id → 줄인 사진의 blob 주소 (shrink)
 const photo = (img, cls = 'ph') => h('img', {
   class: cls, src: smallUrl.get(imgId(img)) || src(img), 'data-orig': src(img), alt: '', loading: 'lazy',
@@ -67,12 +75,14 @@ function progress(label, frac, startedAt) {
 let kids = [];
 let book = null; // {kid, name, days, reportCount, parentCount}
 let editing = false;
+let animate = false; // 다음 draw 에서 천천히 나타나기를 할지 (새로 만들었을 때만)
 
 async function boot() {
   try {
     cut = await store.get(CUT, {});
     cutPhotos = await store.get(CUT_PHOTO, {});
     focus = await store.get(FOCUS, {});
+    faceN = await store.get(FACES, {});
     const list = await api.enrollments();
     const m = new Map();
     for (const e of list) {
@@ -144,6 +154,8 @@ $('make').onclick = async () => {
     $('fields').textContent = JSON.stringify({ 내id: me?.id ?? null, 어린이집_글: sample && shape(sample), 부모_글로_본_것: parentSample && shape(parentSample) }, null, 1);
     const name = givenName(kid.name);
     book = { kid, name, days: buildStory(reports, { name }), reportCount: reports.length, parentCount };
+    animate = true;
+    scrollTo(0, 0);
     draw(); // PDF로 저장은 사진 위치를 다 맞추면 열린다 (printReady)
     $('edit').disabled = false;
   } catch (e) {
@@ -217,8 +229,20 @@ function draw() {
   let page = 1;
   const pageFoot = () => h('div', { class: 'pagefoot' }, h('span', {}, `${name}의 어린이집 이야기`), h('span', {}, ++page));
 
-  // 표지: 처음 사진을 크게, 중간과 마지막 사진을 작게
-  const coverPics = [pics[0], pics[Math.floor(pics.length / 2)], pics[pics.length - 1]];
+  // 달마다 묶기
+  const months = new Map();
+  for (const d of days) {
+    const k = d.date.slice(0, 7);
+    if (!months.has(k)) months.set(k, []);
+    months.get(k).push(d);
+  }
+  // 혼자 나온 사진인지 알아볼 후보: 달마다 앞쪽 사진 8장 (표지·달 첫 사진·자란 모습 비교에 쓴다)
+  candidates = [...months.values()].flatMap((ds) => ds.filter((d) => !d.cut).flatMap((d) => d.photos).slice(0, 8));
+  const monthPics = (ds) => ds.filter((d) => !d.cut).flatMap((d) => d.photos);
+
+  // 표지: 학년 처음·가운데·끝 무렵의 사진 (혼자 나온 사진을 먼저)
+  const third = Math.max(1, Math.floor(pics.length / 3));
+  const coverPics = [pick(pics.slice(0, third)), pick(pics.slice(third, third * 2)) || pics[Math.floor(pics.length / 2)], pick(pics.slice(third * 2)) || pics[pics.length - 1]];
   const cover = h('section', { class: 'sheet cover' },
     h('div', { class: 'kicker' }, `GROWING DAYS · ${first.slice(0, 4)}${last.slice(0, 4) !== first.slice(0, 4) ? `–${last.slice(0, 4)}` : ''}`),
     h('h1', {}, `${name}의`, h('br'), span >= 10 ? '어린이집 한 해' : '어린이집 날들'),
@@ -239,30 +263,44 @@ function draw() {
       h('div', { class: 'grid' }, firsts.slice(0, 12).map((d) => h('div', { class: 'item reveal' },
         d.photos[0] ? photo(d.photos[0]) : null,
         h('span', {}, [dayLabel(d.date).replace(/ \S+요일$/, ''), ageLabel(kid.birth, d.date)].filter(Boolean).join(' · ')),
-        h('p', {}, d.first),
+        h('p', {}, textView(d.first)),
       ))),
       pageFoot())
     : null;
 
-  // 달마다 한 장 (내용이 길면 인쇄할 때 다음 장으로 이어진다)
-  const months = new Map();
-  for (const d of days) {
-    const k = d.date.slice(0, 7);
-    if (!months.has(k)) months.set(k, []);
-    months.get(k).push(d);
-  }
+  // 달마다 한 장 (내용이 길면 인쇄할 때 다음 장으로 이어진다).
+  // 첫머리에 그달을 대표하는 사진 한 장과 선생님 문장 한 줄을 크게 싣는다
   const monthSheets = [...months].map(([k, ds]) => {
     const m = Number(k.slice(5, 7));
     const live = ds.filter((d) => !d.cut);
+    const line = bestLine(live.flatMap((d) => d.parts), name);
+    const lineDay = line && live.find((d) => d.parts.includes(line));
+    const heroPic = (lineDay?.photos.length && pick(lineDay.photos)) || pick(monthPics(ds));
     return h('section', { class: 'sheet month' },
       h('div', { class: 'month-head' },
         h('span', { class: 'num' }, m),
         h('div', {}, h('h2', {}, MONTH_TITLE[m]),
           h('small', {}, [ageLabel(kid.birth, `${k}-01`), `알림장 ${live.length}편`, live.some((d) => d.photos.length) ? `사진 ${live.reduce((n, d) => n + d.photos.length, 0)}장` : ''].filter(Boolean).join(' · ')))),
-      h('div', { class: 'line' }, ds.map((d) => dayView(d))),
+      heroPic || line
+        ? h('figure', { class: 'hero' + (heroPic ? '' : ' text-only') },
+          heroPic ? photo(heroPic) : null,
+          line ? h('blockquote', {}, h('p', {}, textView(line)), h('cite', {}, dayLabel(lineDay.date).replace(/ \S+요일$/, ''))) : null)
+        : null,
+      h('div', { class: 'line' }, ds.map((d) => dayView(d, heroPic))),
       pageFoot(),
     );
   });
+
+  // 자란 모습: 학년 처음과 끝 무렵, 혼자 나온 사진을 나란히
+  const mk = [...months.keys()];
+  const startPic = mk.length >= 2 && pick(monthPics(months.get(mk[0])).filter(solo));
+  const endPic = mk.length >= 2 && pick([...mk].reverse().map((k) => monthPics(months.get(k)).filter(solo).pop()).filter(Boolean));
+  const grow = startPic && endPic && imgId(startPic) !== imgId(endPic)
+    ? h('div', { class: 'grow reveal' },
+      h('figure', {}, photo(startPic), h('figcaption', {}, `${Number(mk[0].slice(5, 7))}월의 ${name}`)),
+      h('span', { class: 'arrow', 'aria-hidden': 'true' }, '→'),
+      h('figure', {}, photo(endPic), h('figcaption', {}, `${Number(mk[mk.length - 1].slice(5, 7))}월의 ${name}`)))
+    : null;
 
   const lastDay = [...shown].reverse().find((d) => d.text.length > 30) || shown[shown.length - 1];
   const closing = h('section', { class: 'sheet closing' },
@@ -272,8 +310,9 @@ function draw() {
       h('div', {}, h('b', {}, shown.length), h('span', {}, '선생님이 들려준 날')),
       h('div', {}, h('b', {}, pics.length), h('span', {}, `${name}의 사진`)),
       h('div', {}, h('b', {}, firsts.length), h('span', {}, '처음의 순간'))),
-    lastDay ? h('div', { class: 'last reveal' }, h('span', {}, `${dayLabel(lastDay.date)} · 마지막 장의 이야기`), h('p', {}, lastDay.text)) : null,
-    h('div', { class: 'write' }, h('b', {}, '엄마·아빠가 남기는 말'), h('div'), h('div'), h('div'), h('div')),
+    grow,
+    lastDay ? h('div', { class: 'last reveal' }, h('span', {}, `${dayLabel(lastDay.date)} · 마지막 장의 이야기`), h('p', {}, textView(lastDay.text))) : null,
+    h('div', { class: 'write' }, h('b', {}, '엄마·아빠가 남기는 말'), h('div'), h('div'), h('div')),
     h('div', { class: 'pagefoot' }, h('span', {}, '이 기록은 내 컴퓨터 안에서만 만들어졌어요 · 우리애 한눈에'), h('span', {}, ++page)),
   );
 
@@ -281,8 +320,10 @@ function draw() {
   $('book').replaceChildren(cover, firstsSheet, ...monthSheets, closing);
   scrollTo(0, y);
   document.title = `${name}의 어린이집 이야기`;
+  // 처음 만들었을 때만 천천히 나타나게. 고치기·사진 맞춘 뒤 다시 그릴 때는 바로 보여서 깜빡이지 않게
   const io = new IntersectionObserver((es) => es.forEach((e) => e.isIntersecting && (e.target.classList.add('on'), io.unobserve(e.target))), { threshold: 0.15 });
-  document.querySelectorAll('.reveal').forEach((el) => (editing ? el.classList.add('on') : io.observe(el)));
+  document.querySelectorAll('.reveal').forEach((el) => (animate && !editing ? io.observe(el) : el.classList.add('on')));
+  animate = false;
   // 고치는 중에는 그날 사진이 모두 보이지만, 책에 들어가지 않는 사진까지 맞추지 않는다 (고치기 끝에 새로 들어온 사진만)
   if (!editing) startFocus();
 }
@@ -290,16 +331,19 @@ function draw() {
 // 책에 실제로 나온 사진(하루 최대 3장, 표지, 처음의 순간들) 중 아직 얼굴 위치를 모르는 것만, 위에서부터 차례로.
 // 이미 맞춘 위치는 저장돼 있어서 다시 하지 않는다. 다 끝났을 때 그사이 책이 바뀌었으면 새로 나온 사진만 이어서 한다
 const failed = new Set(); // 이번에 받지 못한 사진 (다시 열면 재시도)
+let candidates = []; // 혼자 나온 사진인지 알아볼 후보 (draw 에서 정한다)
 function startFocus() {
   if (focusJob) return;
-  const todo = [...new Map([...document.querySelectorAll('#book img[data-id]')]
-    .map((el) => [el.dataset.id, { id: el.dataset.id, url: el.dataset.orig }])).values()]
-    .filter((p) => !(p.id in focus) && !failed.has(p.id));
+  const shownPics = [...document.querySelectorAll('#book img[data-id]')].map((el) => ({ id: el.dataset.id, url: el.dataset.orig }));
+  const want = candidates.filter((p) => !(imgId(p) in faceN)).map((p) => ({ id: imgId(p), url: src(p) }));
+  const todo = [...new Map([...shownPics.filter((p) => !(p.id in focus)), ...want].map((p) => [p.id, p])).values()]
+    .filter((p) => !failed.has(p.id));
   if (!todo.length) return printReady(true);
   printReady(false);
   focusJob = findFaces(todo).finally(() => {
     focusJob = null;
-    if (!editing) startFocus();
+    // 혼자 나온 사진을 새로 알게 되면 표지·달 첫 사진이 바뀔 수 있어 다시 그린다 (그 뒤 새로 나온 사진만 이어서)
+    if (!editing) draw();
   });
 }
 
@@ -331,6 +375,7 @@ async function findFaces(todo) {
       const res = await human.detect(canvas);
       const faces = (res.face || []).filter((f) => (f.faceScore ?? f.score ?? 1) >= 0.5 && Math.min(f.box[2], f.box[3]) >= 16)
         .map((f) => [f.box[0] / canvas.width, f.box[1] / canvas.height, f.box[2] / canvas.width, f.box[3] / canvas.height]);
+      faceN[p.id] = faces.length;
       if (faces.length) {
         const x0 = Math.min(...faces.map((b) => b[0])), x1 = Math.max(...faces.map((b) => b[0] + b[2]));
         const y0 = Math.min(...faces.map((b) => b[1])), y1 = Math.max(...faces.map((b) => b[1] + b[3]));
@@ -342,10 +387,10 @@ async function findFaces(todo) {
       continue;
     }
     document.querySelectorAll(`img[data-id="${CSS.escape(p.id)}"]`).forEach((el) => { el.style.objectPosition = focus[p.id]; });
-    if (n % 10 === 0) await store.set(FOCUS, focus);
+    if (n % 10 === 0) await Promise.all([store.set(FOCUS, focus), store.set(FACES, faceN)]);
   }
   } finally {
-    await store.set(FOCUS, focus).catch(() => {});
+    await Promise.all([store.set(FOCUS, focus), store.set(FACES, faceN)]).catch(() => {});
     progress(null);
   }
 }
@@ -387,12 +432,13 @@ async function shrinkAll(label) {
   return pics;
 }
 
-function dayView(d) {
+function dayView(d, heroPic) {
   // 고치는 중에는 원래 남은 문장을 모두 보여주고, 뺀 문장은 줄을 긋는다
   const orig = book.days.find((x) => x.id === d.id);
   const all = editing ? orig.parts : d.parts;
-  // 고치는 중에는 사진을 모두 보여주고(뺀 사진은 흐리게), 누르면 빼거나 되돌린다
-  const pics = editing ? orig.photos : d.photos.slice(0, 3);
+  // 고치는 중에는 사진을 모두 보여주고(뺀 사진은 흐리게), 누르면 빼거나 되돌린다.
+  // 달 첫머리에 크게 실은 사진은 그날 사진에서 또 보여주지 않는다
+  const pics = editing ? orig.photos : d.photos.filter((p) => !heroPic || imgId(p) !== imgId(heroPic)).slice(0, 3);
   const picView = (p) => (editing
     ? h('button', { class: 'pic' + (cutPhotos[imgId(p)] ? ' off' : ''), title: cutPhotos[imgId(p)] ? '누르면 되돌려요' : '누르면 이 사진을 빼요', onclick: () => togglePhoto(p) }, photo(p))
     : photo(p));
@@ -402,7 +448,7 @@ function dayView(d) {
     all.length
       ? editing
         ? h('p', {}, all.map((s) => h('button', { class: 'sent' + (cutSentence(d, s) ? ' off' : ''), title: '누르면 이 문장을 빼요', onclick: () => toggleSentence(d, s) }, s)))
-        : h('p', {}, d.text)
+        : h('p', {}, textView(d.text))
       : null,
     pics.length ? h('div', { class: `pics n${Math.min(pics.length, 3)}` }, pics.map(picView)) : null,
   );

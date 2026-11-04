@@ -82,6 +82,43 @@ export function buildStory(reports, { name = '' } = {}) {
   return days;
 }
 
+/**
+ * 한 달을 대표할 문장 고르기 (달 첫머리에 크게 싣는다). 고쳐 쓰지 않고 고르기만 한다.
+ * 아이가 한 말(따옴표), "처음", 아이 이름이 든 문장, 너무 길지 않은 문장을 먼저.
+ */
+export function lineScore(s, name = '') {
+  let n = 0;
+  if (SAID.test(s)) n += 3;
+  if (FIRST.test(s)) n += 3;
+  if (name && s.includes(name)) n += 2;
+  if (/웃|안아|사랑|좋아|박수|뿌듯|자랑|대견|씩씩|용기|고마/.test(s)) n += 1;
+  if (s.length >= 18 && s.length <= 90) n += 2;
+  else if (s.length > 140) n -= 2;
+  return n;
+}
+export function bestLine(parts, name = '') {
+  let best = null, score = 2; // 점수가 낮으면 고르지 않는다
+  for (const s of parts) {
+    const n = lineScore(s, name);
+    if (n > score) { best = s; score = n; }
+  }
+  return best;
+}
+// 아이가 한 말: 따옴표 안의 짧은 말 ("몰라", "부드러워요")
+export const SAID = /["“'‘][^"”'’]{1,30}["”'’]/;
+/** 글을 [일반, 아이가 한 말, 일반, …] 조각으로 (화면에서 아이 말만 색을 달리한다) */
+export function splitSaid(text) {
+  const out = [];
+  let last = 0;
+  for (const m of text.matchAll(/["“'‘][^"”'’]{1,30}["”'’]/g)) {
+    if (m.index > last) out.push({ t: text.slice(last, m.index) });
+    out.push({ t: m[0], said: true });
+    last = m.index + m[0].length;
+  }
+  if (last < text.length) out.push({ t: text.slice(last) });
+  return out;
+}
+
 /** 문장을 이어 붙인다. 이모지로 끝나던 문장은 마침표가 없어져서 채운다 */
 export const joinParts = (parts) => parts.map((s) => (/[.!?~♡♥^ㅎㅋ)"']$/.test(s) ? s : `${s}.`)).join(' ');
 
