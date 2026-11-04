@@ -11,6 +11,7 @@ if (!('update_url' in chrome.runtime.getManifest())) {
   document.querySelector('.foot').append(
     Object.assign(document.createElement('a'), { href: 'dev/eval.html', target: '_blank', textContent: '개발: 얼굴 측정' }),
     Object.assign(document.createElement('a'), { href: 'dev/prep-eval.html', target: '_blank', textContent: '개발: 알림장 내보내기' }),
+    Object.assign(document.createElement('a'), { href: 'dev/story.html', target: '_blank', textContent: '개발: 성장 기록' }),
   );
 }
 // 예상 못 한 오류는 문장만 진단용으로 남긴다 (주소·id 는 지움, 어디로도 보내지 않음)

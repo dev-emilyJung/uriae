@@ -6,3 +6,6 @@ site/admin-data.json
 site/admin-full.html
 site/admin-sources.json
 tests/private/
+
+# 성장 기록 시안 배경 음악 (Pixabay 음원, 음원만 따로 배포 금지라 저장소에 안 올림)
+extension/dev/audio/
