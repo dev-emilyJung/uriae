@@ -17,7 +17,15 @@
     <span id="status" class="status"></span>
     <span class="spacer"></span>
     <button id="music" class="ghost" aria-pressed="false">♪ 음악 켜기</button>
-    <button id="saveHtml" class="ghost" disabled>HTML 파일로 받기</button>
+    <button id="saveHtml" class="ghost" disabled title="사진과 음악이 든 파일 하나. 빠르고, 확장 없이 어느 컴퓨터에서나 열려요">HTML 파일로 받기 (추천)</button>
+    <label title="한 해 전체는 100쪽이 넘어 인쇄 미리보기가 오래 걸려요. 계절별로 나눠 저장하면 빨라요">PDF 범위
+      <select id="part">
+        <option value="spring">봄 (표지·처음의 순간들·3~5월)</option>
+        <option value="summer">여름 (6~8월)</option>
+        <option value="autumn">가을 (9~11월)</option>
+        <option value="winter">겨울 (12~2월·마지막 장)</option>
+        <option value="all">한 해 전체 (느림)</option>
+      </select></label>
     <button id="print" disabled>PDF로 저장</button>
     <div id="progress" class="progress" hidden>
       <div class="track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div class="fill"></div></div>

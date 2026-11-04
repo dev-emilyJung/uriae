@@ -128,5 +128,18 @@ body.editing .day:hover { outline-color: var(--rule); outline-offset: 6px; }
   .bar, .hint, .dev { display: none; }
   #book { display: block; padding: 0; }
   .sheet { box-shadow: none; width: 210mm; min-height: 297mm; break-after: page; }
+  .sheet.skip-print { display: none; }
   .reveal { opacity: 1 !important; transform: none !important; }
+  /* 종이에서는 조금 촘촘하게: 쪽수가 줄어 미리보기와 파일이 가벼워진다 */
+  .sheet.month { padding: 56px 64px 48px; }
+  .day { padding-bottom: 20px; }
+  .day p { font-size: 15px; line-height: 1.72; }
+  .day .pics { margin-top: 10px; }
+  .day .pics.n1 { grid-template-columns: minmax(0, 240px); }
+  .day .pics.n2 { grid-template-columns: repeat(2, minmax(0, 190px)); }
+  .day .pics.n3 { grid-template-columns: repeat(3, minmax(0, 170px)); }
+  .hero img { aspect-ratio: 16 / 9; }
+  .hero blockquote p { font-size: 19px; }
 }
+.progress.done .fill { background: #3E7B57; }
+.progress.done .label { color: #2F6446; font-weight: 600; }

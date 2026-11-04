@@ -56,8 +56,11 @@ const CUT_PHOTO = 'dev:storyCutPhotos'; // {"사진 id": true}
 let cutPhotos = {};
 const imgId = (p) => String(p.id ?? src(p).split('?')[0]);
 // 진행 막대: 지금 하는 일, 비율, 남은 시간 (지금까지 걸린 시간으로 어림)
+let doneTimer = null;
 function progress(label, frac, startedAt) {
   const box = $('progress');
+  clearTimeout(doneTimer);
+  box.classList.remove('done');
   if (frac == null) { box.hidden = true; return; }
   box.hidden = false;
   const pct = Math.max(2, Math.min(100, Math.round(frac * 100)));
@@ -70,6 +73,17 @@ function progress(label, frac, startedAt) {
     eta = left < 10 ? ' · 곧 끝나요' : left < 60 ? ` · 약 ${Math.ceil(left / 10) * 10}초 남음` : ` · 약 ${Math.ceil(left / 60)}분 남음`;
   }
   box.querySelector('.label').textContent = `${label} ${pct}%${eta}`;
+}
+/** 끝났다는 걸 분명히: 막대를 꽉 채우고 완료 문구를 몇 초 보여준 뒤 닫는다 */
+function progressDone(text) {
+  const box = $('progress');
+  clearTimeout(doneTimer);
+  box.hidden = false;
+  box.classList.add('done');
+  box.querySelector('.fill').style.width = '100%';
+  box.querySelector('.track').setAttribute('aria-valuenow', 100);
+  box.querySelector('.label').textContent = text;
+  doneTimer = setTimeout(() => { box.hidden = true; box.classList.remove('done'); }, 6000);
 }
 
 let kids = [];
@@ -276,7 +290,7 @@ function draw() {
     const line = bestLine(live.flatMap((d) => d.parts), name);
     const lineDay = line && live.find((d) => d.parts.includes(line));
     const heroPic = (lineDay?.photos.length && pick(lineDay.photos)) || pick(monthPics(ds));
-    return h('section', { class: 'sheet month' },
+    return h('section', { class: 'sheet month', 'data-m': m },
       h('div', { class: 'month-head' },
         h('span', { class: 'num' }, m),
         h('div', {}, h('h2', {}, MONTH_TITLE[m]),
@@ -332,13 +346,19 @@ function draw() {
 // 이미 맞춘 위치는 저장돼 있어서 다시 하지 않는다. 다 끝났을 때 그사이 책이 바뀌었으면 새로 나온 사진만 이어서 한다
 const failed = new Set(); // 이번에 받지 못한 사진 (다시 열면 재시도)
 let candidates = []; // 혼자 나온 사진인지 알아볼 후보 (draw 에서 정한다)
+let printWasLocked = false; // 사진 맞추느라 저장 버튼을 잠갔었는지 (풀릴 때 완료 문구를 보여주려고)
 function startFocus() {
   if (focusJob) return;
   const shownPics = [...document.querySelectorAll('#book img[data-id]')].map((el) => ({ id: el.dataset.id, url: el.dataset.orig }));
   const want = candidates.filter((p) => !(imgId(p) in faceN)).map((p) => ({ id: imgId(p), url: src(p) }));
   const todo = [...new Map([...shownPics.filter((p) => !(p.id in focus)), ...want].map((p) => [p.id, p])).values()]
     .filter((p) => !failed.has(p.id));
-  if (!todo.length) return printReady(true);
+  if (!todo.length) {
+    if (printWasLocked) progressDone('✓ 사진 맞추기를 마쳤어요. 이제 PDF로 저장하거나 HTML 파일로 받을 수 있어요.');
+    printWasLocked = false;
+    return printReady(true);
+  }
+  printWasLocked = true;
   printReady(false);
   focusJob = findFaces(todo).finally(() => {
     focusJob = null;
@@ -369,6 +389,7 @@ async function findFaces(todo) {
   for (const p of todo) {
     progress(`사진 속 얼굴 위치 맞추는 중 (${n}/${todo.length}장)`, n / todo.length, t0);
     n++;
+    if (n === todo.length) progress(`사진 속 얼굴 위치 맞추는 중 (마지막 사진)`, 0.99, t0);
     try {
       // 인쇄용으로 줄인 사진도 이때 같이 만들어 둔다 (PDF 미리보기가 빨라진다)
       const canvas = await loadCanvas(await shrink(p), 512);
@@ -462,8 +483,17 @@ $('print').onclick = async () => {
   if (editing) $('edit').click();
   try {
     btn.textContent = '사진 준비하는 중…';
+    // 한 해 전체는 100쪽이 넘어 크롬 인쇄 미리보기가 멈추기 쉽다. 계절을 고르면 그 달만 (표지는 매번, 처음의 순간들은 봄, 마지막 장은 겨울에)
+    const part = PARTS[$('part').value];
+    document.querySelectorAll('#book > .sheet').forEach((s) => {
+      const m = Number(s.dataset.m);
+      const keep = !part || s.classList.contains('cover')
+        || (s.classList.contains('firsts') && part.firsts) || (s.classList.contains('closing') && part.closing)
+        || (m && part.months.includes(m));
+      s.classList.toggle('skip-print', !keep);
+    });
     await shrinkAll('인쇄용으로 사진 줄이는 중');
-    const imgs = [...document.querySelectorAll('#book img')];
+    const imgs = [...document.querySelectorAll('#book .sheet:not(.skip-print) img')];
     imgs.forEach((i) => { i.loading = 'eager'; });
     // 받지 못하는 사진 하나 때문에 멈추지 않게 20초까지만 기다린다
     await Promise.race([
@@ -471,11 +501,20 @@ $('print').onclick = async () => {
       new Promise((r) => setTimeout(r, 20000)),
     ]);
     document.querySelectorAll('.reveal').forEach((el) => el.classList.add('on'));
+    $('status').textContent = '인쇄 창에서 대상 "PDF로 저장", 여백 "없음", "배경 그래픽" 켜기를 골라 주세요.';
     print();
   } finally {
+    document.querySelectorAll('.skip-print').forEach((s) => s.classList.remove('skip-print'));
     btn.textContent = 'PDF로 저장';
     delete btn.dataset.busy;
   }
+};
+const PARTS = {
+  all: null,
+  spring: { months: [3, 4, 5], firsts: true },
+  summer: { months: [6, 7, 8] },
+  autumn: { months: [9, 10, 11] },
+  winter: { months: [12, 1, 2], closing: true },
 };
 
 // HTML 파일 하나로 받기: 사진(줄인 것)과 음악 한 곡을 파일 안에 넣어서, 인터넷이나 확장 없이도 열어 보고 인쇄할 수 있게
@@ -517,7 +556,7 @@ ${music ? `<script>const b=document.getElementById('play'),a=document.getElement
     a.click();
     setTimeout(() => URL.revokeObjectURL(a.href), 60000);
   } finally {
-    btn.textContent = 'HTML 파일로 받기';
+    btn.textContent = 'HTML 파일로 받기 (추천)';
     delete btn.dataset.busy;
   }
 };
