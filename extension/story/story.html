@@ -13,9 +13,11 @@
     <label>아이 <select id="kid"></select></label>
     <label>학년 <select id="year"></select></label>
     <button id="make">만들기</button>
-    <button id="edit" class="ghost" aria-pressed="false" disabled>고치기</button>
     <span id="status" class="status"></span>
     <span class="spacer"></span>
+    <!-- 책을 만든 뒤에만 보이는 버튼 -->
+    <span id="outs" class="outs" hidden>
+    <button id="edit" class="ghost" aria-pressed="false" disabled>고치기</button>
     <button id="music" class="ghost" aria-pressed="false">♪ 음악 켜기</button>
     <button id="saveHtml" class="ghost" disabled title="사진과 음악이 든 파일 하나. 빠르고, 확장 없이 어느 컴퓨터에서나 열려요">HTML 파일로 받기 (추천)</button>
     <label title="한 해 전체는 100쪽이 넘어 인쇄 미리보기가 오래 걸려요. 계절별로 나눠 저장하면 빨라요">PDF 범위
@@ -27,15 +29,19 @@
         <option value="all">한 해 전체 (느림)</option>
       </select></label>
     <button id="print" disabled>PDF로 저장</button>
+    </span>
     <div id="progress" class="progress" hidden>
       <div class="track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div class="fill"></div></div>
       <span class="label"></span>
     </div>
   </div>
-  <p class="hint">알림장은 이 컴퓨터 안에서만 읽고, 어디로도 보내지 않아요. 선생님 글은 고치지 않고, 준비물·안내·비용·결석·인사 문장과 우리가 보낸 알림장만 뺍니다. 더 빼고 싶은 문장이나 날은 <b>고치기</b>를 누른 뒤 눌러서 지워요.
-    PDF로 저장: 인쇄 창에서 대상을 <b>PDF로 저장</b>, 여백 <b>없음</b>, <b>배경 그래픽</b>을 켜 주세요. 사진이 많으면 미리보기가 뜨는 데 1~2분 걸릴 수 있어요.
-    <b>HTML 파일로 받기</b>는 사진과 음악이 든 파일 하나로 저장해서, 확장 없이 어느 컴퓨터에서나 열어 보고 인쇄할 수 있어요.</p>
-  <main id="book"></main>
+  <main id="book">
+    <div class="empty">
+      <h1>한 해의 알림장을<br />한 권의 책으로</h1>
+      <p>위에서 학년을 고르고 <b>만들기</b>를 눌러 주세요.</p>
+      <small>알림장과 사진은 이 컴퓨터 안에서만 읽어요</small>
+    </div>
+  </main>
   <details class="dev"><summary>개발: 알림장 항목 이름 (0~2세 식사·수면 칸이 있는지)</summary><pre id="fields"></pre></details>
   <audio id="audio" preload="none"></audio>
   <script type="module" src="story.js"></script>

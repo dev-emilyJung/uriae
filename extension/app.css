@@ -281,6 +281,7 @@ body.noscroll { overflow: hidden; }
 .diag-preview { max-height: 360px; font-size: 12px; }
 
 /* 성장 기록 탭 (책은 story/story.html 새 탭에서) */
-.story-intro { padding: 8px 0; max-width: 40em; }
-.story-intro h2 { font-size: 20px; margin: 0 0 8px; color: var(--ink); }
-.story-intro .toolbar { margin: 18px 0 6px; }
+.story-intro { padding: 40px 0; text-align: center; }
+.story-intro h2 { font-size: 24px; margin: 0 0 10px; color: var(--ink); }
+.story-intro p { margin: 0 0 22px; }
+.story-intro .muted { margin: 12px 0 0; font-size: 13px; }

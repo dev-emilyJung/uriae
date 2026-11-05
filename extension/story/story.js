@@ -117,7 +117,6 @@ async function boot() {
     if (at >= 0) $('kid').value = String(at);
     $('kid').onchange = fillYears;
     fillYears();
-    $('status').textContent = '아이와 학년을 고르고 만들기를 눌러 주세요.';
   } catch (e) {
     $('status').textContent = e instanceof NotLoggedInError ? '키즈노트 웹에 먼저 로그인해 주세요.' : '오류: ' + (e.message || e);
   }
@@ -143,7 +142,7 @@ function fillYears() {
   }
   $('year').replaceChildren(...opts);
   $('make').disabled = !opts.length;
-  if (!opts.length) $('status').textContent = '성장 기록은 어린이집 만 0~2세 시기만 만들 수 있어요.';
+  $('status').textContent = opts.length ? '' : '성장 기록은 어린이집 만 0~2세 시기만 만들 수 있어요.';
 }
 
 $('make').onclick = async () => {
@@ -179,6 +178,7 @@ $('make').onclick = async () => {
     book = { kid, name, days: buildStory(reports, { name }), reportCount: reports.length, parentCount };
     animate = true;
     scrollTo(0, 0);
+    $('outs').hidden = false;
     draw(); // PDF로 저장은 사진 위치를 다 맞추면 열린다 (printReady)
     $('edit').disabled = false;
   } catch (e) {

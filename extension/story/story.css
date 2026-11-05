@@ -143,3 +143,12 @@ body.editing .day:hover { outline-color: var(--rule); outline-offset: 6px; }
 }
 .progress.done .fill { background: #3E7B57; }
 .progress.done .label { color: #2F6446; font-weight: 600; }
+
+/* 만들기 전 빈 화면, 만든 뒤에만 보이는 버튼 */
+.outs { display: contents; }
+.outs[hidden] { display: none; }
+.empty { margin: 12vh auto 0; text-align: center; color: var(--soft); }
+.empty h1 { font-size: 40px; line-height: 1.35; color: var(--ink); }
+.empty p { margin: 22px 0 8px; font-size: 16px; }
+.empty small { font-size: 13px; color: var(--faint); }
+.progress[hidden] { display: none; }

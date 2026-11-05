@@ -176,17 +176,9 @@ function showStory() {
   render(
     h('div', { class: 'story-intro' },
       h('h2', {}, `${name}의 어린이집 한 해를 책으로`),
-      h('p', {}, '선생님이 써 주신 알림장을 학년(3월 ~ 다음 해 2월) 단위로 엮어요. 선생님 글은 고치지 않고, 준비물·안내·비용 같은 공지 문장과 우리가 보낸 알림장만 빼요.'),
-      h('ul', { class: 'diag-list' },
-        h('li', {}, '달마다 대표 사진과 선생님 문장 한 줄, 날짜별 이야기'),
-        h('li', {}, '처음의 순간들, 아이가 한 말, 한 해 동안 자란 모습'),
-        h('li', {}, 'HTML 파일(사진·음악 포함)이나 PDF로 저장해서 간직하거나 인쇄'),
-      ),
-      h('p', { class: 'muted' }, '선생님이 일기처럼 써 주시는 어린이집 만 0~2세 반에 맞춰 만들었어요. 지금 유치원에 다녀도 예전 어린이집 시기 알림장이 키즈노트에 있으면 만들 수 있어요.'),
-      h('div', { class: 'toolbar' },
-        h('a', { class: 'btn', href: `story/story.html?child=${encodeURIComponent(kid.child)}`, target: '_blank', rel: 'noopener' }, `${name} 성장 기록 만들기`),
-      ),
-      h('p', { class: 'muted' }, '새 탭에서 열려요. 알림장과 사진은 이 컴퓨터 안에서만 읽고, 어디로도 보내지 않아요.'),
+      h('p', {}, '선생님 알림장을 달마다 사진과 함께 엮어요.'),
+      h('a', { class: 'btn', href: `story/story.html?child=${encodeURIComponent(kid.child)}`, target: '_blank', rel: 'noopener' }, '성장 기록 만들기'),
+      h('p', { class: 'muted' }, '어린이집 만 0~2세 알림장 · 새 탭에서 열려요'),
     ),
   );
 }
