@@ -58,6 +58,14 @@ test('부모가 보낸 알림장 알아보기', () => {
   assert.equal(byParent({ author: { id: 3, type: 'parent' } }, 7), true);
   assert.equal(byParent({ author: { id: 3, type: 'teacher' } }, 7), false);
   assert.equal(byParent({}, null), false);
+  // 로그인한 사람이 아닌 다른 가족 계정: 이름으로
+  for (const name of ['박선우 엄마', '선우아빠', '선우 할머니', '선우 외할아버지', '선우맘']) {
+    assert.equal(byParent({ author: { id: 3, name } }, 7), true, name);
+  }
+  assert.equal(byParent({ author_name: '선우 어머님' }, 7), true);
+  for (const name of ['김은지 선생님', '햇살반', '원장', '햇살반 담임']) {
+    assert.equal(byParent({ author: { id: 3, name } }, 7), false, name);
+  }
 });
 
 test('만 나이', () => {

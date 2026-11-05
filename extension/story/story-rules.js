@@ -126,12 +126,17 @@ export const joinParts = (parts) => parts.map((s) => (/[.!?~♡♥^ㅎㅋ)"']$/.
  * 부모(우리)가 기관에 보낸 알림장인지. 키즈노트는 양쪽 글이 같은 목록에 온다.
  * 작성자 칸 이름이 확인되지 않아, 흔한 칸 이름을 모두 살핀다: 작성자 id 가 내 id 이거나, 작성자 종류가 부모.
  */
+const FAMILY = /(엄마|아빠|어머니|아버지|어머님|아버님|할머니|할아버지|할머님|할아버님|이모|고모|삼촌|외삼촌|맘|대디|파파|보호자|mom|dad|mother|father)$/i;
 export function byParent(r, meId) {
   const who = [r.author, r.writer, r.user, r.created_by, r.owner].find((x) => x && typeof x === 'object') || {};
   const ids = [who.id, r.author_id, r.writer_id, r.user_id, typeof r.created_by === 'number' ? r.created_by : null].filter((x) => x != null);
   if (meId != null && ids.some((x) => String(x) === String(meId))) return true;
   const kind = [who.type, who.role, who.user_type, r.author_type, r.writer_type, r.role, r.type].filter((x) => typeof x === 'string').join(' ');
   if (/parent|guardian|family|부모|학부모|보호자/i.test(kind)) return true;
+  // 가족 계정은 보통 "선우 엄마", "선우아빠", "선우 할머니" 같은 이름이다 (로그인한 사람이 아닌 다른 가족이 쓴 글)
+  const names = [who.name, who.nickname, who.username, who.display_name, r.author_name, r.writer_name, r.user_name, r.author_nickname,
+    typeof r.author === 'string' ? r.author : null, typeof r.writer === 'string' ? r.writer : null].filter((x) => typeof x === 'string');
+  if (names.some((n) => FAMILY.test(n.trim()))) return true;
   return r.is_parent === true || r.from_parent === true || r.is_sent_by_parent === true;
 }
 
