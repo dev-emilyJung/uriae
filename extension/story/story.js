@@ -4,9 +4,13 @@
 import { api, paginate, NotLoggedInError } from '../lib/api.js';
 import { ymd } from '../lib/extract.js';
 import { store } from '../lib/store.js';
+import { logError } from '../lib/diag.js';
 import { buildStory, ageLabel, MONTH_TITLE, byParent, joinParts, norm, bestLine, splitSaid } from './story-rules.js';
 
 const $ = (id) => document.getElementById(id);
+// 예상 못 한 오류는 문장만 진단 파일용으로 남긴다 (주소·id 는 지움)
+addEventListener('error', (e) => logError(e.error || e.message, 'story'));
+addEventListener('unhandledrejection', (e) => logError(e.reason, 'story'));
 function h(tag, attrs = {}, ...kids) {
   const el = document.createElement(tag);
   for (const [k, v] of Object.entries(attrs)) {
@@ -118,6 +122,7 @@ async function boot() {
     $('kid').onchange = fillYears;
     fillYears();
   } catch (e) {
+    if (!(e instanceof NotLoggedInError)) logError(e, 'story');
     $('status').textContent = e instanceof NotLoggedInError ? '키즈노트 웹에 먼저 로그인해 주세요.' : '오류: ' + (e.message || e);
   }
 }
@@ -183,6 +188,7 @@ $('make').onclick = async () => {
     $('edit').disabled = false;
   } catch (e) {
     progress(null);
+    if (!(e instanceof NotLoggedInError)) logError(e, 'story');
     $('status').textContent = e instanceof NotLoggedInError ? '키즈노트 웹에 먼저 로그인해 주세요.' : '오류: ' + (e.message || e);
   } finally {
     $('make').disabled = false;
