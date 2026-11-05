@@ -19,4 +19,21 @@ noCdn('node_modules/tesseract.js/dist/tesseract.esm.min.js', 'extension/vendor/o
 noCdn('node_modules/tesseract.js/dist/worker.min.js', 'extension/vendor/ocr/worker.min.js');
 cpSync('node_modules/tesseract.js-core/tesseract-core-simd-lstm.wasm.js', 'extension/vendor/ocr/tesseract-core-simd-lstm.wasm.js');
 cpSync('node_modules/@tesseract.js-data/kor/4.0.0_best_int/kor.traineddata.gz', 'extension/vendor/ocr/kor.traineddata.gz');
+
+
+// 성장 기록 글꼴(Gowun Batang, IBM Plex Sans KR, 둘 다 OFL): 구글 글꼴 서버 대신 확장 안의 파일을 쓴다.
+// 글자 범위(unicode-range)별로 나뉜 woff2 라서 책에 나온 글자의 조각만 읽는다
+mkdirSync('extension/vendor/fonts', { recursive: true });
+const FONTS = { 'gowun-batang': [400, 700], 'ibm-plex-sans-kr': [400, 500, 600] };
+let fontCss = '';
+for (const [name, weights] of Object.entries(FONTS)) {
+  for (const w of weights) {
+    const css = readFileSync(`node_modules/@fontsource/${name}/${w}.css`, 'utf8')
+      .replace(/, url\([^)]+\.woff\) format\('woff'\)/g, '')
+      .replaceAll('./files/', './');
+    for (const [, f] of css.matchAll(/url\(\.\/([^)]+\.woff2)\)/g)) cpSync(`node_modules/@fontsource/${name}/files/${f}`, `extension/vendor/fonts/${f}`);
+    fontCss += css;
+  }
+}
+writeFileSync('extension/vendor/fonts/fonts.css', fontCss);
 console.log('vendor 복사 완료');

@@ -279,3 +279,8 @@ body.noscroll { overflow: hidden; }
 .diag-list li { margin-bottom: 4px; }
 .diag-opt { display: flex; gap: 8px; align-items: baseline; font-size: 14px; margin-bottom: 14px; }
 .diag-preview { max-height: 360px; font-size: 12px; }
+
+/* 성장 기록 탭 (책은 story/story.html 새 탭에서) */
+.story-intro { padding: 8px 0; max-width: 40em; }
+.story-intro h2 { font-size: 20px; margin: 0 0 8px; color: var(--ink); }
+.story-intro .toolbar { margin: 18px 0 6px; }

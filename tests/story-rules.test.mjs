@@ -1,7 +1,7 @@
 // 성장 기록 규칙: 선생님 이야기는 남기고, 안내·비용·결석·답장·부모 글은 뺀다
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { buildStory, byParent, ageLabel, sentences, bestLine, splitSaid } from '../extension/dev/story-rules.js';
+import { buildStory, byParent, ageLabel, sentences, bestLine, splitSaid } from '../extension/story/story-rules.js';
 
 test('달을 대표할 문장: 아이가 한 말·처음이 든 문장을 고르고, 밋밋하면 고르지 않는다', () => {
   const said = '구름을 만져보면 어떤 느낌일지 물어보자 처음에는 "몰라"하다가 "부드러워요" 하며 웃었어요.';

@@ -25,22 +25,28 @@
   - 받기: HTML 파일(추천, 사진·음악 포함) / PDF는 계절별(한 해 전체는 180쪽이 넘어 미리보기가 멈춤)
   - 규칙 테스트: `tests/story-rules.test.mjs`
 - 사용자가 선우 실데이터로 써 봄: "너무 괜찮다", "처음의 순간들 감동".
+- 2026-11-05 (회사): 정식 화면으로 옮김 → **1.0.4** (manifest 올림, 아직 업로드 전)
+  - 들어가는 곳: 세 번째 탭 **"성장 기록"** (사용자 결정. 소개 + "○○ 성장 기록 만들기" → 새 탭 `extension/story/story.html?child=`)
+  - 파일: `extension/dev/story*` → `extension/story/`, 음악 `extension/story/audio/` (gitignore, zip 스크립트가 없으면 멈춤)
+  - 글꼴: 구글 글꼴 대신 `extension/vendor/fonts` (fontsource woff2, `npm run vendor`). 받은 HTML 파일만 구글 글꼴 주소
+  - 저장 이름 `dev:story…` → `story:…` (예전 값 이어서 읽음). "알림장 항목 이름"은 개발용 설치에서만
+  - 개인정보처리방침(2항 성장 기록, 6항), 스토어 설명·개인정보 탭(store/listing.md), NOTICE(글꼴·음악)
+  - zip 약 38MB (음악 14MB, 글꼴 7MB)
 
 ### 회사 PC에서 이어서 할 일
 
 1. `git pull`
 2. **음악 파일 복사** (저장소에 안 올림, Pixabay 라이선스: 음원만 따로 배포 금지):
-   `porch/public/audio/night/*.mp3` → `uriae/extension/dev/audio/` (출처: `porch/docs/plan/CAT-WORLD.md`)
+   `porch/public/audio/night/*.mp3` → `uriae/extension/story/audio/` (출처: `porch/docs/plan/CAT-WORLD.md`)
    - 회사 PC는 porch 저장소가 `C:\emily\private-file\porch\porch` 에 있다. 2026-11-05 복사 완료
-3. 개발용 확장 새로고침 → 바닥글 "개발: 성장 기록" → 선우, 학년 고르고 만들기
+3. 개발용 확장 새로고침 → **성장 기록 탭** → 만들기 → 선우, 학년 고르고 만들기
 4. 확인할 것
    - 사진 맞추기 끝나면 초록 완료 문구가 뜨는지, PDF 계절별 저장이 빨라졌는지, HTML 파일로 받기
    - 남은 공지·잘못 빠진 문장 (캡처해서 규칙 보강)
    - 맨 아래 "개발: 알림장 항목 이름" 내용 → 부모가 보낸 알림장 구분(`byParent`)을 정확한 칸으로 고치기
-5. 개발자 모드로 직접 테스트한 뒤 확장 화면에 넣기 → 1.0.4 zip
-   - 넣을 자리: "우리 애 사진" 탭 안 "성장 기록 만들기" (탭은 늘리지 않음)
-   - 음악 mp3를 zip에 넣는 방법 (zip 스크립트가 porch 에서 복사하거나, extension 안 gitignore 폴더)
-   - 개인정보처리방침·스토어 설명: 성장 기록, 뺀 문장·사진과 얼굴 위치 저장(chrome.storage), 줄인 사진 캐시(Cache Storage)
+5. 개발자 모드로 직접 테스트 → `npm run zip` → uriae-1.0.4.zip 업로드 (화면 넣기·개인정보 문구는 끝남)
+   - 스토어 대시보드에서 설명을 store/listing.md 대로 바꾸고, 개인정보 탭의 단일 목적·storage 문구도 바꾸기
+   - 서버 `cd /opt/uriae && sudo git pull` (개인정보처리방침)
    - 점검할 상황: 로그인 안 됨, 생일 없음, 아이 여럿, 만 3세 이상만, 그 학년 알림장 없음/전부 공지, 사진 없음, 사진 받기 실패, 사진 수천 장, 인쇄 설정(여백 없음·배경 그래픽), 고치기 중 다시 만들기
 6. 승인 뒤: 홈페이지에 성장 기록 소개 (선우 이름·얼굴 OK, **다른 친구가 나온 사진은 쓰지 않기**, 원·반·선생님·친구 이름 든 문장 제외. 사용자가 HTML/PDF를 주면 감동 부분만 추려 시안 → 확인 후 반영), 서버 `cd /opt/uriae && sudo git pull`
 7. 릴스·스레드: `marketing/reels-edit-brief.md`, `marketing/growth-story-brief.md`. 승인 전이면 "곧 나와요"로만.

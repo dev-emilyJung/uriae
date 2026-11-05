@@ -11,7 +11,6 @@ if (!('update_url' in chrome.runtime.getManifest())) {
   document.querySelector('.foot').append(
     Object.assign(document.createElement('a'), { href: 'dev/eval.html', target: '_blank', textContent: '개발: 얼굴 측정' }),
     Object.assign(document.createElement('a'), { href: 'dev/prep-eval.html', target: '_blank', textContent: '개발: 알림장 내보내기' }),
-    Object.assign(document.createElement('a'), { href: 'dev/story.html', target: '_blank', textContent: '개발: 성장 기록' }),
   );
 }
 // 예상 못 한 오류는 문장만 진단용으로 남긴다 (주소·id 는 지움, 어디로도 보내지 않음)
@@ -165,7 +164,31 @@ function showTab(tab) {
   currentTab = tab;
   classBar.hidden = tab !== 'prep' || kidClasses().length < 2;
   document.querySelectorAll('.tabs button').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.tab === tab)));
-  ({ prep: showPrep, photos: showPhotos, faces: showFaces })[tab]();
+  ({ prep: showPrep, photos: showPhotos, faces: showFaces, story: showStory })[tab]();
+}
+
+// ───────────────────────── 성장 기록 ─────────────────────────
+// 책은 사진이 많고 인쇄까지 해서 새 탭(story/story.html)에서 만든다. 여기서는 소개와 여는 버튼만.
+function showStory() {
+  const kid = kidsOf(enrollments).find((k) => k.child === currentKid);
+  if (!kid) return;
+  const name = givenName(kid.name);
+  render(
+    h('div', { class: 'story-intro' },
+      h('h2', {}, `${name}의 어린이집 한 해를 책으로`),
+      h('p', {}, '선생님이 써 주신 알림장을 학년(3월 ~ 다음 해 2월) 단위로 엮어요. 선생님 글은 고치지 않고, 준비물·안내·비용 같은 공지 문장과 우리가 보낸 알림장만 빼요.'),
+      h('ul', { class: 'diag-list' },
+        h('li', {}, '달마다 대표 사진과 선생님 문장 한 줄, 날짜별 이야기'),
+        h('li', {}, '처음의 순간들, 아이가 한 말, 한 해 동안 자란 모습'),
+        h('li', {}, 'HTML 파일(사진·음악 포함)이나 PDF로 저장해서 간직하거나 인쇄'),
+      ),
+      h('p', { class: 'muted' }, '선생님이 일기처럼 써 주시는 어린이집 만 0~2세 반에 맞춰 만들었어요. 지금 유치원에 다녀도 예전 어린이집 시기 알림장이 키즈노트에 있으면 만들 수 있어요.'),
+      h('div', { class: 'toolbar' },
+        h('a', { class: 'btn', href: `story/story.html?child=${encodeURIComponent(kid.child)}`, target: '_blank', rel: 'noopener' }, `${name} 성장 기록 만들기`),
+      ),
+      h('p', { class: 'muted' }, '새 탭에서 열려요. 알림장과 사진은 이 컴퓨터 안에서만 읽고, 어디로도 보내지 않아요.'),
+    ),
+  );
 }
 
 // ───────────────────────── 챙길 것 ─────────────────────────

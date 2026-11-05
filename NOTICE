@@ -33,3 +33,13 @@ This product bundles the following third-party software:
 6. Tesseract Korean language data, 4.0.0_best_int (extension/vendor/ocr/kor.traineddata.gz)
    https://github.com/tesseract-ocr/tessdata_best via @tesseract.js-data/kor
    License: Apache-2.0
+
+7. Gowun Batang and IBM Plex Sans KR fonts (extension/vendor/fonts/*.woff2)
+   https://github.com/yangheeryu/Gowun-Batang, https://github.com/IBM/plex
+   via @fontsource/gowun-batang and @fontsource/ibm-plex-sans-kr 5.3.0
+   License: SIL Open Font License 1.1. Bundled so the extension never loads Google Fonts.
+
+8. Background music for the growth story (extension/story/audio/*.mp3, not in this repository)
+   calm piano, peaceful piano, romantic piano by marlowemusic on Pixabay
+   License: Pixabay Content License. Included only inside the extension package;
+   the audio files are not distributed on their own.

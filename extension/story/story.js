@@ -1,4 +1,4 @@
-// 성장 기록 시안 (개발용, 배포 zip에는 포함하지 않음)
+// 성장 기록 (확장 화면의 "성장 기록" 탭에서 새 탭으로 연다. ?child=아이 id 면 그 아이를 먼저 고른다)
 // 아이의 알림장을 기간만큼 읽어, 선생님 글에서 공지성 문장만 빼고 날짜별 타임라인 책으로 보여준다.
 // 알림장과 사진은 이 브라우저 안에서만 읽고 그린다. PDF는 브라우저 인쇄의 "PDF로 저장"으로 만든다.
 import { api, paginate, NotLoggedInError } from '../lib/api.js';
@@ -27,10 +27,10 @@ const dayLabel = (d) => {
 const dotDate = (d) => d.replaceAll('-', '. ') + '.';
 const src = (img) => img.large || img.original || img.small;
 // 사진은 칸에 맞춰 잘리므로, 얼굴이 있는 곳을 가운데로 둔다 (얼굴 위치는 이 컴퓨터에서 찾아 저장)
-const FOCUS = 'dev:storyFocus'; // {"사진 id": "x% y%"}
+const FOCUS = 'story:focus'; // {"사진 id": "x% y%"}
 let focus = {};
 // 사진 속 얼굴 수: 표지·달 첫 사진·자란 모습 비교에는 우리 아이 혼자 나온 사진(얼굴 1개)을 먼저 쓴다
-const FACES = 'dev:storyFaces'; // {"사진 id": 얼굴 수}
+const FACES = 'story:faces'; // {"사진 id": 얼굴 수}
 let faceN = {};
 const solo = (p) => faceN[imgId(p)] === 1;
 /** 혼자 나온 사진을 먼저, 없으면 아무 사진 */
@@ -50,9 +50,9 @@ const shape = (o) => Object.fromEntries(Object.entries(o).map(([k, v]) => [k,
     : typeof v === 'string' ? (/^[a-z_]{1,20}$/i.test(v) ? v : `글 ${v.length}자`) : v]));
 
 // 직접 뺀 날·문장 (이 브라우저에만 저장)
-const CUT = 'dev:storyCut'; // {"알림장id": true(그날 전체) | ["문장 키", …]}
+const CUT = 'story:cut'; // {"알림장id": true(그날 전체) | ["문장 키", …]}
 let cut = {};
-const CUT_PHOTO = 'dev:storyCutPhotos'; // {"사진 id": true}
+const CUT_PHOTO = 'story:cutPhotos'; // {"사진 id": true}
 let cutPhotos = {};
 const imgId = (p) => String(p.id ?? src(p).split('?')[0]);
 // 진행 막대: 지금 하는 일, 비율, 남은 시간 (지금까지 걸린 시간으로 어림)
@@ -91,12 +91,18 @@ let book = null; // {kid, name, days, reportCount, parentCount}
 let editing = false;
 let animate = false; // 다음 draw 에서 천천히 나타나기를 할지 (새로 만들었을 때만)
 
+// 개발용 설치(압축 해제 로드)에서만 알림장 항목 이름을 보여준다
+const DEV = !('update_url' in chrome.runtime.getManifest());
+if (!DEV) document.querySelector('details.dev')?.remove();
+// 시안 때 쓰던 저장 이름(dev:story…)에 남은 고친 내용도 이어서 쓴다
+const load = async (key, old) => (await store.get(key, null)) ?? (await store.get(old, {}));
+
 async function boot() {
   try {
-    cut = await store.get(CUT, {});
-    cutPhotos = await store.get(CUT_PHOTO, {});
-    focus = await store.get(FOCUS, {});
-    faceN = await store.get(FACES, {});
+    cut = await load(CUT, 'dev:storyCut');
+    cutPhotos = await load(CUT_PHOTO, 'dev:storyCutPhotos');
+    focus = await load(FOCUS, 'dev:storyFocus');
+    faceN = await load(FACES, 'dev:storyFaces');
     const list = await api.enrollments();
     const m = new Map();
     for (const e of list) {
@@ -106,6 +112,9 @@ async function boot() {
     }
     kids = [...m.values()];
     $('kid').replaceChildren(...kids.map((k, i) => h('option', { value: i }, k.name)));
+    const want = new URLSearchParams(location.search).get('child');
+    const at = kids.findIndex((k) => String(k.child) === want);
+    if (at >= 0) $('kid').value = String(at);
     $('kid').onchange = fillYears;
     fillYears();
     $('status').textContent = '아이와 학년을 고르고 만들기를 눌러 주세요.';
@@ -165,7 +174,7 @@ $('make').onclick = async () => {
       reports.push({ id: r.id, date: postYMD(r), content: r.content || '', images: r.attached_images || [] });
     }
     progress(null);
-    $('fields').textContent = JSON.stringify({ 내id: me?.id ?? null, 어린이집_글: sample && shape(sample), 부모_글로_본_것: parentSample && shape(parentSample) }, null, 1);
+    if (DEV) $('fields').textContent = JSON.stringify({ 내id: me?.id ?? null, 어린이집_글: sample && shape(sample), 부모_글로_본_것: parentSample && shape(parentSample) }, null, 1);
     const name = givenName(kid.name);
     book = { kid, name, days: buildStory(reports, { name }), reportCount: reports.length, parentCount };
     animate = true;
@@ -541,6 +550,8 @@ $('saveHtml').onclick = async () => {
     const css = await (await fetch('story.css')).text();
     const music = await fetch('audio/calm-piano.mp3').then((r) => (r.ok ? r.blob() : null)).then((b) => b && toDataUrl(b)).catch(() => null);
     const title = `${book.name}의 어린이집 이야기`.replace(/[<>&"]/g, '');
+    // 받은 파일은 확장 밖에서 열리므로 글꼴은 구글 글꼴 주소로 둔다 (인터넷이 없으면 기본 글꼴로 보인다).
+    // 확장 화면 자체는 vendor/fonts 의 글꼴만 쓴다
     const html = `<!doctype html>
 <html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${title}</title>
