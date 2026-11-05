@@ -31,6 +31,7 @@
 1. `git pull`
 2. **음악 파일 복사** (저장소에 안 올림, Pixabay 라이선스: 음원만 따로 배포 금지):
    `porch/public/audio/night/*.mp3` → `uriae/extension/dev/audio/` (출처: `porch/docs/plan/CAT-WORLD.md`)
+   - 회사 PC는 porch 저장소가 `C:\emily\private-file\porch\porch` 에 있다. 2026-11-05 복사 완료
 3. 개발용 확장 새로고침 → 바닥글 "개발: 성장 기록" → 선우, 학년 고르고 만들기
 4. 확인할 것
    - 사진 맞추기 끝나면 초록 완료 문구가 뜨는지, PDF 계절별 저장이 빨라졌는지, HTML 파일로 받기
