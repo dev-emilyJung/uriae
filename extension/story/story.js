@@ -485,9 +485,23 @@ function dayView(d, heroPic) {
 }
 
 // PDF: 늦게 불러오는 사진까지 다 받은 뒤 인쇄 창을 연다
+// 인쇄 창 설정 안내 (대상·여백·배경 그래픽). "다음부터 안 보기"를 고르면 이 브라우저에서는 건너뛴다
+const GUIDE_SKIP = 'story:printGuideSkip';
+async function printGuide() {
+  if (await store.get(GUIDE_SKIP, false)) return true;
+  const dlg = $('printGuide');
+  dlg.returnValue = '';
+  dlg.showModal();
+  await new Promise((r) => dlg.addEventListener('close', r, { once: true }));
+  if (dlg.returnValue !== 'ok') return false;
+  if ($('printGuideSkip').checked) await store.set(GUIDE_SKIP, true);
+  return true;
+}
+
 $('print').onclick = async () => {
   const btn = $('print');
   if (btn.dataset.busy) return;
+  if (!(await printGuide())) return;
   btn.dataset.busy = '1';
   if (editing) $('edit').click();
   try {
@@ -510,7 +524,6 @@ $('print').onclick = async () => {
       new Promise((r) => setTimeout(r, 20000)),
     ]);
     document.querySelectorAll('.reveal').forEach((el) => el.classList.add('on'));
-    $('status').textContent = '인쇄 창에서 대상 "PDF로 저장", 여백 "없음", "배경 그래픽" 켜기를 골라 주세요.';
     print();
   } finally {
     document.querySelectorAll('.skip-print').forEach((s) => s.classList.remove('skip-print'));

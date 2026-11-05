@@ -44,6 +44,24 @@
   </main>
   <details class="dev"><summary>개발: 알림장 항목 이름 (0~2세 식사·수면 칸이 있는지)</summary><pre id="fields"></pre></details>
   <audio id="audio" preload="none"></audio>
+  <!-- PDF로 저장을 누르면 인쇄 창을 열기 전에 한 번 보여주는 설정 안내 -->
+  <dialog id="printGuide" class="guide">
+    <form method="dialog">
+      <h2>PDF로 저장하기 전에</h2>
+      <p>곧 열리는 인쇄 창에서 세 가지만 맞춰 주세요.</p>
+      <ol>
+        <li><span>대상</span><b>PDF로 저장</b></li>
+        <li><span>여백</span><b>없음</b><small>설정 더보기 안에 있어요</small></li>
+        <li><span>옵션</span><b>배경 그래픽 ✓</b><small>끄면 책 바탕색과 사진 테두리가 빠져요</small></li>
+      </ol>
+      <p class="note">사진이 많으면 미리보기가 뜨는 데 1~2분 걸릴 수 있어요.</p>
+      <label class="skip"><input type="checkbox" id="printGuideSkip" /> 다음부터 안 보기</label>
+      <div class="actions">
+        <button value="cancel" class="ghost">취소</button>
+        <button value="ok" autofocus>확인, 인쇄 창 열기</button>
+      </div>
+    </form>
+  </dialog>
   <script type="module" src="story.js"></script>
 </body>
 </html>
