@@ -579,9 +579,9 @@ $('saveHtml').onclick = async () => {
 <style>${css}
 .play{position:fixed;right:20px;bottom:20px;z-index:5;font:600 14px var(--sans);padding:10px 16px;border-radius:99px;border:1px solid var(--accent);background:#fff;color:var(--accent);cursor:pointer}
 @media print{.play{display:none}}</style></head>
-<body>${music ? `<button class="play" id="play">♪ 음악 켜기</button><audio id="au" loop src="${music}"></audio>` : ''}
+<body>${music ? `<button class="play" id="play">♪ 음악 끄기</button><audio id="au" loop src="${music}"></audio>` : ''}
 <main id="book">${clone.innerHTML}</main>
-${music ? `<script>const b=document.getElementById('play'),a=document.getElementById('au');let off=false;const on=()=>{if(off||!a.paused)return;a.volume=.5;a.play().then(()=>{b.textContent='♪ 음악 끄기'},()=>{})};b.onclick=(e)=>{e.stopPropagation();if(a.paused){off=false;on()}else{a.pause();off=true;b.textContent='♪ 음악 켜기'}};on();addEventListener('pointerdown',(e)=>{if(e.target!==b)on()},{once:true});addEventListener('keydown',on,{once:true})</script>` : ''}
+${music ? `<script>const b=document.getElementById('play'),a=document.getElementById('au');let off=false;const on=()=>{if(off||!a.paused)return;a.volume=.5;a.play().catch(()=>{})};b.onclick=()=>{off=!off;b.textContent=off?'♪ 음악 켜기':'♪ 음악 끄기';off?a.pause():on()};on();addEventListener('pointerdown',(e)=>{if(e.target!==b)on()},{once:true});addEventListener('keydown',on,{once:true})</script>` : ''}
 </body></html>`;
     const a = h('a', { href: URL.createObjectURL(new Blob([html], { type: 'text/html' })), download: `${title}.html` });
     a.click();
@@ -592,16 +592,16 @@ ${music ? `<script>const b=document.getElementById('play'),a=document.getElement
   }
 };
 
-// 배경 음악: Pixabay 피아노 3곡을 섞어서 이어 튼다. 열리자마자 천천히 커지며 시작하고,
-// 브라우저가 소리 자동 재생을 막으면 처음 누르는 만들기에서 시작한다. 직접 끄면 다시 켜지 않는다
+// 배경 음악: Pixabay 피아노 3곡을 섞어서 이어 튼다. 기본은 켜짐(버튼은 "끄기"): 열리자마자 천천히 커지며 시작하고,
+// 브라우저가 소리 자동 재생을 막으면 처음 누르는 만들기에서 시작한다. 끄면 다시 켤 때까지 조용히
 const TRACKS = ['calm-piano.mp3', 'peaceful-piano.mp3', 'romantic-piano.mp3'].sort(() => Math.random() - 0.5);
 let track = 0;
 const audio = $('audio');
 audio.onended = () => { track = (track + 1) % TRACKS.length; audio.src = `audio/${TRACKS[track]}`; audio.play(); };
-let userStopped = false;
+let wantMusic = true;
 async function musicOn() {
   const btn = $('music');
-  if (!audio.paused || userStopped) return;
+  if (!audio.paused || !wantMusic) return;
   if (!audio.src) audio.src = `audio/${TRACKS[track]}`;
   audio.volume = 0;
   try {
@@ -610,20 +610,15 @@ async function musicOn() {
     if (e.name !== 'NotAllowedError') btn.textContent = '음악 파일 없음'; // NotAllowedError: 아직 아무것도 안 눌러서 막힘
     return;
   }
-  btn.textContent = '♪ 음악 끄기';
-  btn.setAttribute('aria-pressed', 'true');
   const fade = setInterval(() => { audio.volume = Math.min(0.6, audio.volume + 0.03); if (audio.volume >= 0.6) clearInterval(fade); }, 120);
 }
 $('music').onclick = () => {
   const btn = $('music');
-  if (audio.paused) {
-    userStopped = false;
-    return musicOn();
-  }
-  audio.pause();
-  userStopped = true;
-  btn.textContent = '♪ 음악 켜기';
-  btn.setAttribute('aria-pressed', 'false');
+  wantMusic = !wantMusic;
+  btn.textContent = wantMusic ? '♪ 음악 끄기' : '♪ 음악 켜기';
+  btn.setAttribute('aria-pressed', String(wantMusic));
+  if (wantMusic) musicOn();
+  else audio.pause();
 };
 musicOn();
 
