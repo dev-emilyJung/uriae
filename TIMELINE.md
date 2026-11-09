@@ -20,7 +20,7 @@
 | 2026-11-08 | 1.0.5 | 성장 기록 빼는 글 보강: 답례품 명단, 보내드리는 물건, 일정 예고, 선생님 사정, 건강 정보 글 — **업로드·검토 대기** (권한·개인정보 변경 없음) |
 
 - 2026-11-01: 홈페이지 구글·네이버 검색 등록, 관리자 통계에 검색/카톡/다른 사이트/직접 구분. 서버 반영 완료.
-- 2026-11-09: 홈페이지 폰→PC 다리 (휴대폰에서 열면 「카톡 나와의 채팅으로 보내기」 · 「밤 9시 알림(캘린더)」 · 네이버 검색어·주소, PC에서 보낸 링크로 오면 안내 한 줄) + 관리자 통계 「폰에서 PC로」(빈 파일 /e 기록). 서버 반영: `cd /opt/uriae && sudo git pull && sudo cp server/update-admin.sh /usr/local/bin/uriae-update-admin && sudo /usr/local/bin/uriae-update-admin` (nginx 설정은 안 바꿈)
+- 2026-11-09: 홈페이지 폰→PC 다리 (휴대폰에서 열면 「카톡 나와의 채팅으로 보내기」 · 네이버 검색어·주소, PC에서 보낸 링크로 오면 안내 한 줄. 「밤 9시 알림(캘린더)」 버튼은 .ics 파일이 받아져 당황스러워 같은 날 뺌, fc55b5e) + 관리자 통계 「폰에서 PC로」(빈 파일 /e 기록). 서버 반영: `cd /opt/uriae && sudo git pull && sudo cp server/update-admin.sh /usr/local/bin/uriae-update-admin && sudo /usr/local/bin/uriae-update-admin` (nginx 설정은 안 바꿈)
 - 웹스토어 설치 수의 루마니아·OS "기타"는 분석 로봇. 실사용은 "사용자"(주간 사용자) 메뉴로 본다.
 
 ## 다음에 할 일 (집·회사 공통)
