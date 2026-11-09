@@ -192,7 +192,7 @@
       .then((f) => {
         const m = f.m || {}, p = f.pc || {};
         bars('funnel', [
-          { d: '폰 · 홈 방문', n: m.home || 0 }, { d: '폰 · 카톡으로 PC에 보냄', n: m.send || 0 }, { d: '폰 · 알림 받기', n: m.remind || 0 },
+          { d: '폰 · 홈 방문', n: m.home || 0 }, { d: '폰 · 카톡으로 PC에 보냄', n: m.send || 0 },
           { d: 'PC · 홈 방문', n: p.home || 0 }, { d: 'PC · 폰이 보낸 링크로 옴', n: p.back || 0 }, { d: 'PC · 설치 버튼 누름', n: p.store || 0 },
         ], (r) => r.d);
         const pct = (a, b) => (b ? `${Math.round((a / b) * 100)}%` : '-');

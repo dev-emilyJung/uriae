@@ -45,7 +45,6 @@
         <p>휴대폰에는 설치할 수 없어요. 잊지 않게 PC로 보내 두세요.</p>
         <div class="bridge">
           <button class="btn" id="sendPc" type="button">카톡 「나와의 채팅」으로 보내기</button>
-          <button class="btn ghost" id="remind" type="button">오늘 밤 9시에 알림 받기</button>
         </div>
         <p class="pc-addr">PC에서는 네이버에 <b>우리애 한눈에</b>를 검색하거나 <b>uriae.emilysoft.com</b> 을 입력하세요.</p>
         <span class="sub" id="copyMsg" role="status"></span>
@@ -186,7 +185,7 @@
       const ping = (a) => { try { fetch(`/e?a=${a}&d=${MOBILE ? 'm' : 'pc'}`, { keepalive: true, cache: 'no-store' }).catch(() => {}); } catch {} };
       document.getElementById('storeBtn').addEventListener('click', () => ping('store'));
 
-      // 휴대폰으로 열었을 때: PC로 넘기는 길 (카톡 나와의 채팅 · 캘린더 알림 · 검색어·주소)
+      // 휴대폰으로 열었을 때: PC로 넘기는 길 (카톡 나와의 채팅 · 검색어·주소 · 11-09 캘린더 알림은 .ics 파일이 받아져 당황스러워 뺌)
       (() => {
         if (!MOBILE) return;
         const msg = document.getElementById('copyMsg');
@@ -203,28 +202,6 @@
           } catch (err) {
             if (err.name !== 'AbortError') msg.textContent = sendUrl;
           }
-        });
-        // 캘린더 알림 (.ics): 오늘 밤 9시, 8시 반이 지났으면 내일 밤 9시
-        const now = new Date(), at = new Date(now);
-        const tomorrow = now.getHours() * 60 + now.getMinutes() > 20 * 60 + 30;
-        at.setHours(21, 0, 0, 0);
-        if (tomorrow) at.setDate(at.getDate() + 1);
-        const rb = document.getElementById('remind');
-        rb.textContent = `${tomorrow ? '내일' : '오늘'} 밤 9시에 알림 받기`;
-        rb.addEventListener('click', () => {
-          ping('remind');
-          const z = (d) => d.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
-          const link = 'https://uriae.emilysoft.com/?from=remind';
-          const ics = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//EmilySoft//uriae//KO', 'BEGIN:VEVENT',
-            `UID:${Date.now()}@uriae.emilysoft.com`, `DTSTAMP:${z(now)}`, `DTSTART:${z(at)}`, `DTEND:${z(new Date(at.getTime() + 600000))}`,
-            'SUMMARY:PC에서 우리애 한눈에 설치하기', `DESCRIPTION:PC 크롬에서 열어 설치하세요 ${link}`, `URL:${link}`,
-            'BEGIN:VALARM', 'ACTION:DISPLAY', 'DESCRIPTION:우리애 한눈에 설치하기', 'TRIGGER:PT0M', 'END:VALARM',
-            'END:VEVENT', 'END:VCALENDAR'].join('\r\n');
-          const a = document.createElement('a');
-          a.href = 'data:text/calendar;charset=utf-8,' + encodeURIComponent(ics);
-          a.download = 'uriae-reminder.ics';
-          document.body.append(a); a.click(); a.remove();
-          msg.textContent = '캘린더에 추가해 주세요. 그 시간에 알림이 와요. 안 열리면 위의 카톡으로 보내기를 써 주세요.';
         });
       })();
 
