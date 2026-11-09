@@ -78,6 +78,11 @@
       <ul class="bars wide" id="srcDays" style="margin-top:14px"></ul>
       <p class="note" style="margin-top:12px" id="shares"></p>
 
+      <h2>폰에서 PC로</h2>
+      <p class="note">우리애는 PC에서만 설치돼요. 폰으로 본 사람이 PC로 넘어가는지, PC에서 설치 버튼까지 누르는지 봅니다. 날짜·기기·브라우저마다 한 번씩 셉니다. (2026-11-09부터 기록)</p>
+      <ul class="bars wide" id="funnel"></ul>
+      <p class="note" style="margin-top:12px" id="funnelNote"></p>
+
       <h2>어느 사이트에서 왔나</h2>
       <p class="note">다른 사이트의 링크를 눌러 들어온 방문입니다. 주소를 직접 입력하거나 앱에서 연 방문은 빠집니다.</p>
       <ul class="bars wide" id="refs"></ul>
@@ -180,6 +185,20 @@
         bars('os', os, (r) => r.d);
       })
       .catch(() => { $('when').textContent = '통계 파일을 아직 만들지 않았어요. 서버에서 uriae-update-admin 을 실행해 주세요.'; });
+
+    // 폰에서 PC로 (server/update-admin.sh 가 만든 admin-funnel.json)
+    fetch('admin-funnel.json', { cache: 'no-store' })
+      .then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); })
+      .then((f) => {
+        const m = f.m || {}, p = f.pc || {};
+        bars('funnel', [
+          { d: '폰 · 홈 방문', n: m.home || 0 }, { d: '폰 · 카톡으로 PC에 보냄', n: m.send || 0 }, { d: '폰 · 알림 받기', n: m.remind || 0 },
+          { d: 'PC · 홈 방문', n: p.home || 0 }, { d: 'PC · 폰이 보낸 링크로 옴', n: p.back || 0 }, { d: 'PC · 설치 버튼 누름', n: p.store || 0 },
+        ], (r) => r.d);
+        const pct = (a, b) => (b ? `${Math.round((a / b) * 100)}%` : '-');
+        $('funnelNote').textContent = `폰 방문 중 PC로 보낸 비율 ${pct((m.send || 0) + (m.remind || 0), m.home)} · PC 방문 중 설치 버튼 누른 비율 ${pct(p.store || 0, p.home)}. 실제 설치 수는 크롬 웹스토어 통계와 비교하세요.`;
+      })
+      .catch(() => { $('funnel').replaceChildren(el('li', 'empty', '아직 집계 전이에요. 서버에서 update-admin.sh 를 다시 복사하고 실행해 주세요.')); });
 
     // 검색인지 카톡인지 (server/update-admin.sh 가 만든 admin-sources.json)
     const SRC = [['search', '검색 (구글·네이버·다음)'], ['kakao', '카톡 (휴대폰)'], ['other', '다른 사이트'], ['direct', '직접·알 수 없음']];

@@ -39,15 +39,19 @@
     <div class="hero">
       <h1>키즈노트 알림,<br />우리 아이 것만 남깁니다</h1>
       <p class="lead">긴 알림장에서 준비물만 뽑아 체크리스트로 만들고, 수천 장 앨범에서 우리 아이가 나온 사진만 골라 한 번에 받습니다.</p>
-      <!-- 휴대폰으로 열면(카톡 공유 등) PC에서 쓰는 도구라는 것과 주소 복사를 먼저 보여준다 -->
+      <!-- 휴대폰으로 열면(인스타·스레드·카톡 등): PC에서 쓰는 도구라, 잊기 전에 PC로 넘기는 길을 먼저 보여준다 (2026-11-09) -->
       <div class="mobile-note" id="mobileNote" hidden>
-        <b>📱 휴대폰에서는 설치할 수 없어요</b>
-        <p>PC의 크롬·엣지·웨일에서 쓰는 확장 프로그램이에요. 이 주소를 PC에서 열어 설치해 주세요.</p>
-        <button class="btn" id="copyUrl" type="button">주소 복사</button>
+        <b>PC에서 쓰는 프로그램이에요</b>
+        <p>휴대폰에는 설치할 수 없어요. 잊지 않게 PC로 보내 두세요.</p>
+        <div class="bridge">
+          <button class="btn" id="sendPc" type="button">카톡 「나와의 채팅」으로 보내기</button>
+          <button class="btn ghost" id="remind" type="button">오늘 밤 9시에 알림 받기</button>
+        </div>
+        <p class="pc-addr">PC에서는 네이버에 <b>우리애 한눈에</b>를 검색하거나 <b>uriae.emilysoft.com</b> 을 입력하세요.</p>
         <span class="sub" id="copyMsg" role="status"></span>
       </div>
       <div class="actions">
-        <a class="btn" href="https://chromewebstore.google.com/detail/pbadjleoagbglgabmmclkmplifcmlfen">Chrome에 추가</a>
+        <a class="btn" id="storeBtn" href="https://chromewebstore.google.com/detail/pbadjleoagbglgabmmclkmplifcmlfen">Chrome에 추가</a>
         <span class="sub">무료, <b>PC</b>의 크롬·엣지·웨일에서 사용</span>
       </div>
 
@@ -177,22 +181,58 @@
       <p class="dev">개발자라면 <a href="https://github.com/dev-emilyJung/uriae">GitHub에서 별</a>을 눌러 주셔도 큰 힘이 됩니다.</p>
     </section>
     <script>
-      // 휴대폰으로 열었을 때: PC에서 쓰는 도구 안내 + 주소 복사
+      const MOBILE = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+      // 어디서 새는지 보려는 기록 (관리자 통계 「폰에서 PC로」): 빈 파일 /e 를 한 번 부른다. 개인 정보는 보내지 않는다
+      const ping = (a) => { try { fetch(`/e?a=${a}&d=${MOBILE ? 'm' : 'pc'}`, { keepalive: true, cache: 'no-store' }).catch(() => {}); } catch {} };
+      document.getElementById('storeBtn').addEventListener('click', () => ping('store'));
+
+      // 휴대폰으로 열었을 때: PC로 넘기는 길 (카톡 나와의 채팅 · 캘린더 알림 · 검색어·주소)
       (() => {
-        if (!/Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent)) return;
-        const note = document.getElementById('mobileNote');
+        if (!MOBILE) return;
         const msg = document.getElementById('copyMsg');
-        note.hidden = false;
+        document.getElementById('mobileNote').hidden = false;
         document.querySelector('.hero .actions').hidden = true; // 휴대폰에서는 설치 버튼이 동작하지 않는다
-        document.getElementById('copyUrl').addEventListener('click', async () => {
-          const url = 'https://uriae.emilysoft.com';
+        const sendUrl = 'https://uriae.emilysoft.com/?from=pc-send';
+        document.getElementById('sendPc').addEventListener('click', async () => {
+          ping('send');
+          const data = { title: '우리애 한눈에', text: 'PC에서 열어 설치하기 (우리애 한눈에)', url: sendUrl };
           try {
-            await navigator.clipboard.writeText(url);
-            msg.textContent = '복사했어요. PC로 보내서 열어 주세요.';
-          } catch {
-            msg.textContent = url;
+            if (navigator.share) { await navigator.share(data); msg.textContent = 'PC 카톡에서 이 링크를 누르면 바로 열려요.'; return; }
+            await navigator.clipboard.writeText(sendUrl);
+            msg.textContent = '주소를 복사했어요. 카톡 「나와의 채팅」에 붙여 넣으면 PC 카톡에서 열 수 있어요.';
+          } catch (err) {
+            if (err.name !== 'AbortError') msg.textContent = sendUrl;
           }
         });
+        // 캘린더 알림 (.ics): 오늘 밤 9시, 8시 반이 지났으면 내일 밤 9시
+        const now = new Date(), at = new Date(now);
+        const tomorrow = now.getHours() * 60 + now.getMinutes() > 20 * 60 + 30;
+        at.setHours(21, 0, 0, 0);
+        if (tomorrow) at.setDate(at.getDate() + 1);
+        const rb = document.getElementById('remind');
+        rb.textContent = `${tomorrow ? '내일' : '오늘'} 밤 9시에 알림 받기`;
+        rb.addEventListener('click', () => {
+          ping('remind');
+          const z = (d) => d.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+          const link = 'https://uriae.emilysoft.com/?from=remind';
+          const ics = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//EmilySoft//uriae//KO', 'BEGIN:VEVENT',
+            `UID:${Date.now()}@uriae.emilysoft.com`, `DTSTAMP:${z(now)}`, `DTSTART:${z(at)}`, `DTEND:${z(new Date(at.getTime() + 600000))}`,
+            'SUMMARY:PC에서 우리애 한눈에 설치하기', `DESCRIPTION:PC 크롬에서 열어 설치하세요 ${link}`, `URL:${link}`,
+            'BEGIN:VALARM', 'ACTION:DISPLAY', 'DESCRIPTION:우리애 한눈에 설치하기', 'TRIGGER:PT0M', 'END:VALARM',
+            'END:VEVENT', 'END:VCALENDAR'].join('\r\n');
+          const a = document.createElement('a');
+          a.href = 'data:text/calendar;charset=utf-8,' + encodeURIComponent(ics);
+          a.download = 'uriae-reminder.ics';
+          document.body.append(a); a.click(); a.remove();
+          msg.textContent = '캘린더에 추가해 주세요. 그 시간에 알림이 와요. 안 열리면 위의 카톡으로 보내기를 써 주세요.';
+        });
+      })();
+
+      // PC에서 휴대폰이 보낸 링크로 들어왔을 때: 할 일은 버튼 하나라고 알려 준다
+      (() => {
+        const f = new URLSearchParams(location.search).get('from');
+        if (MOBILE || (f !== 'pc-send' && f !== 'remind')) return;
+        document.querySelector('.hero .actions .sub').innerHTML = '휴대폰에서 보내 두신 링크예요. <b>Chrome에 추가</b>를 누르면 끝이에요.';
       })();
 
       // 의견 보내기

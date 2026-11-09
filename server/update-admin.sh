@@ -57,6 +57,31 @@ awk -F'"' '
   }
 ' "$RAW" "$DATA" > /tmp/uriae-admin-sources.json && mv /tmp/uriae-admin-sources.json "$WEB/admin-sources.json"
 
+# 폰에서 PC로 (admin-funnel.json, 2026-11-09): 기기(폰 m · PC pc)마다 홈 방문 · 설치 버튼 · (폰) PC로 보내기·알림 · (PC) 보낸 링크로 다시 옴
+#  - 버튼은 홈페이지가 부르는 빈 파일 /e?a=store|send|remind 기록으로 센다 (개인 정보 없음)
+#  - 날짜·IP·브라우저마다 한 번씩
+awk -F'"' '
+  function ip(s) { split(s, a, " "); return a[1] }
+  function day(s) { split(s, a, "[\\[:]"); return a[2] }
+  function once(k) { if (k in seen) return 0; seen[k] = 1; return 1 }
+  {
+    k = day($1) "|" ip($1) "|" $6; d = ($6 ~ /Android|iPhone|iPad|iPod|Mobile/) ? "m" : "pc"
+    if ($2 ~ /^GET \/(index\.html)?([?#][^ ]*)? /) {
+      if (once("h|" k)) n[d, "home"]++
+      if ($2 ~ /[?&]from=(pc-send|remind)/ && once("b|" k)) n[d, "back"]++
+    } else if (match($2, /^GET \/e\?a=[a-z]+/)) {
+      act = substr($2, 10, RLENGTH - 9)
+      if (once(act "|" k)) n[d, act]++
+    }
+  }
+  END {
+    printf "{"
+    split("m pc", D, " "); sep = ""
+    for (i = 1; i <= 2; i++) { x = D[i]; printf "%s\"%s\":{\"home\":%d,\"store\":%d,\"send\":%d,\"remind\":%d,\"back\":%d}", sep, x, n[x, "home"], n[x, "store"], n[x, "send"], n[x, "remind"], n[x, "back"]; sep = "," }
+    print "}"
+  }
+' "$DATA" > /tmp/uriae-admin-funnel.json && mv /tmp/uriae-admin-funnel.json "$WEB/admin-funnel.json"
+
 if [ -s "$DATA" ] \
   && goaccess "$DATA" $OPTS -o /tmp/uriae-admin.json > /tmp/uriae-goaccess.log 2>&1 \
   && goaccess "$DATA" $OPTS --html-report-title="우리애 한눈에 방문 통계" -o /tmp/uriae-admin-full.html >> /tmp/uriae-goaccess.log 2>&1; then

@@ -47,6 +47,10 @@ a:focus-visible, .btn:focus-visible { outline: 2px solid var(--pen); outline-off
 .mobile-note b { font-size: 17px; }
 .mobile-note p { margin: 6px 0 12px; color: var(--soft); }
 .mobile-note .sub { display: block; margin-top: 8px; color: var(--soft); font-size: 14px; }
+.mobile-note .bridge { display: grid; gap: 8px; }
+.mobile-note .bridge .btn { text-align: center; }
+.mobile-note .pc-addr { margin: 12px 0 0; font-size: 14px; }
+.mobile-note .pc-addr b { font-size: inherit; color: var(--ink); }
 .actions { display: flex; gap: 20px; align-items: center; flex-wrap: wrap; }
 .btn {
   display: inline-block; background: var(--pen); color: #fff; text-decoration: none; font-weight: 600;
