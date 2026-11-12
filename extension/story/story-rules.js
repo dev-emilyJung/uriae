@@ -43,6 +43,8 @@ const REPLY_HEAD = /^\s*(?:에고|어머나?|아이고|넵|네넵|네네|아하|
 const STORY = /(?:었|았|였|했|웠|렀|켰|줬)(?:어요|답니다|네요|습니다)/;
 // 인사·맺음말 (짧은 문장만)
 const GREETING = /^(?:안녕하세요|좋은\s*(?:아침|오후|저녁)|[가-힣]{0,4}\s*(?:어머님|아버님|부모님)[\s,~!.^]*$)|(?:행복|즐거운|편안한|따뜻한|좋은|건강한)\s*(?:한\s*)?(?:저녁|주말|하루|밤|시간|연휴)\s*(?:보내|되)/;
+// 문장이 끝났는지 (마침표·느낌표나 "~요/~다" 같은 맺음)
+const ENDED = /(?:[.!?~♡♥^ㅎㅋㅠㅜ)"'”’]|[요다죠네까음함임])$/;
 // 기록할 만한 순간
 const FIRST = /처음|첫\s?(?:걸음|등원|발|마디|말)|드디어|혼자서|혼자\s*(?:힘으로|서|걸|먹|신|입)|스스로/;
 
@@ -75,7 +77,10 @@ export function buildStory(reports, { name = '' } = {}) {
   };
   const days = [];
   for (const r of all.sort((a, b) => a.date.localeCompare(b.date))) {
-    let kept = r.parts.filter((s) => !NOTICE.test(s) && !NOTICE_SHAPE.test(s) && !(s.length < 40 && GREETING.test(s)) && !repeated(s));
+    const keep = r.parts.map((s) => !NOTICE.test(s) && !NOTICE_SHAPE.test(s) && !(s.length < 40 && GREETING.test(s)) && !repeated(s));
+    // 줄바꿈으로 한 문장이 나뉜 경우("…활동했던⏎작품을 보내드립니다"): 뒷부분이 빠지면 끝맺지 않은 앞부분도 뺀다
+    for (let i = keep.length - 2; i >= 0; i--) if (keep[i] && !keep[i + 1] && !ENDED.test(r.parts[i])) keep[i] = false;
+    let kept = r.parts.filter((_, i) => keep[i]);
     // 글 전체가 안내문이면(반 전체 공지가 알림장으로 온 경우) 남은 문장도 모두 뺀다:
     // 안내문 모양 줄이 둘 이상, 문장 절반 이상이 이미 빠짐, 또는 아이 이름 없이 딱딱한 말투가 대부분
     const shapeLines = r.lines.filter((l) => NOTICE_SHAPE.test(l)).length;

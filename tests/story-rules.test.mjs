@@ -77,6 +77,12 @@ test('답례품 명단·일정 예고·선생님 사정·건강 정보는 빼고
     '가베 특별활동 보강-1 공의 색깔을 관찰했어요~ 식중독을 예방하는 그림을 손가락으로 가리켰어요.']);
 });
 
+test('줄바꿈으로 나뉜 문장의 뒷부분이 빠지면 앞부분도 남기지 않는다', () => {
+  const [d] = story(['영어. 알파벳 P~Z까지 대문자와 소문자의 모양을 알아보았어요. 선우가 큰 소리로 따라 했어요.\n내일은 지니어스에서 1년동안 활동했던\n작품을 보내드립니다.']);
+  assert.ok(!d.text.includes('활동했던'), d.text);
+  assert.match(d.text, /따라 했어요\.$/);
+});
+
 test('부모가 보낸 알림장 알아보기', () => {
   assert.equal(byParent({ author: { id: 7 } }, 7), true);
   assert.equal(byParent({ author: { id: 3, type: 'parent' } }, 7), true);
